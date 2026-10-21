@@ -1,7 +1,8 @@
 #!/bin/bash
 # Sets up the two keys that releases are signed with, once, on the maintainer's Mac. Then it copies
 # each secret that the release workflow needs to the clipboard in turn, for you to paste into the
-# release environment on GitHub. No private key is written to a file.
+# release environment on GitHub: for this Mac only, never through Universal Clipboard to your other
+# devices, and hidden from clipboard managers. No private key is written to a file.
 #   scripts/make-release-keys.sh
 #
 # - The release certificate is your "Teams Pulse Signing" certificate from your login keychain
@@ -106,8 +107,9 @@ Wrote both to $REQUIREMENT_FILE and $PLIST.
 
 Now add three secrets to the release environment. On github.com, open the repository's
 Settings › Environments › release, and under "Environment secrets" click "Add environment secret"
-for each. This copies each value to the clipboard in turn, marked so that clipboard managers skip it,
-and clears the clipboard at the end. For a backup, paste each into your password manager too.
+for each. This copies each value to the clipboard in turn, for this Mac only (Universal Clipboard
+doesn't offer it to your other devices) and marked so that clipboard managers skip it, and clears the
+clipboard at the end. For a backup, paste each into your password manager too.
 
 EOF
 # A new password each time: it only protects the copy on its way to GitHub.

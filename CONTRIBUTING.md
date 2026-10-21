@@ -156,7 +156,8 @@ and deletes it from the runner. It then signs the zip and writes `appcast.xml`
 
 A release needs two private keys, which only the maintainer's Mac and the `release` environment
 hold. `scripts/make-release-keys.sh` sets both up and copies them, one at a time, to the clipboard
-for the environment's secrets, without writing them to a file:
+for the environment's secrets. It never writes them to a file, and keeps them on the Mac: Universal
+Clipboard doesn't offer them to your other devices, and clipboard managers skip them.
 
 - **The release certificate** signs the app. macOS ties Full Disk Access to it, so every release
   must be signed with the same one, or every user loses the access. It's the maintainer's
