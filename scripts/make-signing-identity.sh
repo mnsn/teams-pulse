@@ -18,6 +18,10 @@ fi
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+# macOS's own LibreSSL, on every Mac. Homebrew's OpenSSL 3, the default openssl on some Macs and on
+# GitHub's macOS 26 runners, writes PKCS #12 files with AES and SHA-256, which older versions of
+# macOS can't import.
+OPENSSL=/usr/bin/openssl
 
 # A leaf certificate for code signing only, valid for 10 years. Nothing needs to trust it: macOS
 # matches the certificate itself against the app's designated requirement.
@@ -34,10 +38,10 @@ keyUsage = critical, digitalSignature
 extendedKeyUsage = critical, codeSigning
 subjectKeyIdentifier = hash
 EOF
-openssl req -x509 -newkey rsa:3072 -sha256 -days 3650 -nodes -config "$WORK/certificate.cnf" \
+"$OPENSSL" req -x509 -newkey rsa:3072 -sha256 -days 3650 -nodes -config "$WORK/certificate.cnf" \
     -keyout "$WORK/key.pem" -out "$WORK/certificate.pem" 2>/dev/null
-PASSWORD="$(openssl rand -hex 16)"
-openssl pkcs12 -export -name "$NAME" -inkey "$WORK/key.pem" -in "$WORK/certificate.pem" \
+PASSWORD="$("$OPENSSL" rand -hex 16)"
+"$OPENSSL" pkcs12 -export -name "$NAME" -inkey "$WORK/key.pem" -in "$WORK/certificate.pem" \
     -passout "pass:$PASSWORD" -out "$WORK/identity.p12"
 
 # -T lets codesign use the private key. The key never leaves the keychain after this.
