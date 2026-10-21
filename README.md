@@ -108,15 +108,16 @@ make install     # builds "Teams Pulse.app", copies it to ~/Applications and ope
 Then give it Full Disk Access as above: it's in `~/Applications` (press ⌘⇧G in the file dialog to
 type the folder). To remove it, run `make uninstall` and remove it from the Full Disk Access list.
 
-It's signed ad hoc, so macOS ties Full Disk Access to that exact build: after each rebuild, remove
-Teams Pulse from the list with −, and add the new build. If you have unread chats saved, macOS may
-also ask whether the new build may use Teams Pulse's keychain item: **Always Allow** is fine there,
-since it covers only that build.
+It's signed ad hoc, so macOS ties Full Disk Access to that exact build, and you allow each rebuild
+again. Turning Teams Pulse off and on in the list keeps the old build's signature, so remove it with
+− (or run `tccutil reset SystemPolicyAllFiles com.asaf.TeamsPulse`), add it again with +, and choose
+**Quit & Reopen**. If you have unread chats saved, macOS may also ask whether the new build may use
+Teams Pulse's keychain item: **Always Allow** is fine there, since it covers only that build.
 
 A copy you build updates itself too, to the release builds, unless you turn off
 **Check for Updates Automatically** and build each new version yourself. Releases are signed with
-the project's certificate, so after that first update, macOS asks for Full Disk Access once more,
-and later updates keep it.
+the project's certificate, so after that first update, allow Full Disk Access once more the same
+way, and later updates keep it.
 
 ### Keeping Full Disk Access across rebuilds
 
@@ -131,7 +132,8 @@ key without asking, not even `codesign`, and it can't be exported: each build as
 password. Click **Allow**, never **Always Allow**, which would let any program running as you use the
 key silently. `make app` refuses to sign with a key that some app may use without asking, and checks
 again after signing. `scripts/make-signing-identity.sh --replace` swaps such a certificate for a new
-one, and `--delete` deletes it, so that builds are signed ad hoc again.
+one, and `--delete` deletes it, so that builds are signed ad hoc again. Either way, allow the next
+build again as above.
 
 Releases are signed the same way, with a certificate of the project's own that only GitHub's release
 workflow can use, which is why updates keep the access. [How it works](docs/how-it-works.md#signing)

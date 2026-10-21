@@ -32,9 +32,11 @@ make package            # what a release ships: the universal app, checked and z
 make icon               # regenerate Resources/AppIcon.icns
 ```
 
-Builds are signed ad hoc, so each one needs Full Disk Access again. With a certificate from
-`make signing-identity`, they keep it, and each build asks for your login password before `codesign`
-can use the certificate's key: click **Allow**, never **Always Allow** (see
+Builds are signed ad hoc, so each one needs Full Disk Access again: turning Teams Pulse off and on in
+the list keeps the old build's signature, so remove it with − (or run
+`tccutil reset SystemPolicyAllFiles com.asaf.TeamsPulse`) and add it again with +. With a
+certificate from `make signing-identity`, they keep it, and each build asks for your login password
+before `codesign` can use the certificate's key: click **Allow**, never **Always Allow** (see
 [Keeping Full Disk Access across rebuilds](README.md#keeping-full-disk-access-across-rebuilds)).
 `scripts/make-signing-identity.sh --delete` goes back to ad hoc. `make package` signs with a
 certificate, as a release does; `export TEAMS_PULSE_SIGNING_KEYCHAIN="$(scripts/ci-signing-identity.sh)"`

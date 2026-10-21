@@ -182,7 +182,7 @@ struct ProblemView: View {
 
     private var message: String {
         if problem == .noAccess, lostAccess {
-            return "It had access before. That happens when it's rebuilt with another signature: in Full Disk Access, remove Teams Pulse with −, then add it again."
+            return "It had access before. That happens when it's rebuilt with another signature, and turning it off and on keeps the old one: in Full Disk Access, remove Teams Pulse with −, then add it again."
         }
         return problem.message
     }

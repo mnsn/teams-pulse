@@ -158,7 +158,11 @@ if $INSTALL; then
     echo "Installed and launched $DEST/$APP_NAME.app"
 fi
 if ! $SIGN_WITH_CERTIFICATE; then
-    echo "note: signed ad hoc, so macOS ties Full Disk Access to this exact build. Give it the access again:" >&2
-    echo "      in Full Disk Access, remove Teams Pulse with −, then add this copy. To keep the access across" >&2
-    echo "      rebuilds, see \"Keeping Full Disk Access across rebuilds\" in the README." >&2
+    # Full Disk Access keeps the requirement of the build that was allowed, even when it's turned off
+    # and on, so the entry has to go before this build can be allowed.
+    echo "note: signed ad hoc, so macOS ties Full Disk Access to this exact build, and turning it off and on" >&2
+    echo "      keeps the old build's. To allow this one, run" >&2
+    echo "      tccutil reset SystemPolicyAllFiles $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Resources/Info.plist)" >&2
+    echo "      (or remove Teams Pulse with − in Privacy & Security › Full Disk Access), and add it again with +." >&2
+    echo "      To keep the access across rebuilds, see \"Keeping Full Disk Access across rebuilds\" in the README." >&2
 fi

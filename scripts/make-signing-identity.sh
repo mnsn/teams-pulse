@@ -12,9 +12,11 @@
 # Always Allow. scripts/build-app.sh refuses to sign with a key that some app may use without asking,
 # and checks again after signing.
 #   --replace   deletes the certificate and its key, such as one an earlier version of this script
-#               made, which let codesign use the key without asking, and makes a new one. Then give
-#               the next build Full Disk Access again.
-#   --delete    only deletes them: builds are signed ad hoc again.
+#               made, which let codesign use the key without asking, and makes a new one. Then allow
+#               the next build again: run tccutil reset SystemPolicyAllFiles com.asaf.TeamsPulse (or
+#               remove Teams Pulse from Full Disk Access with −), and add it with +.
+#   --delete    only deletes them: builds are signed ad hoc again, and each one has to be allowed again
+#               like that.
 #   --check     says, without asking anything, whether some app may use the key without asking.
 #
 # TEAMS_PULSE_SIGNING_IDENTITY picks another name. With TEAMS_PULSE_KEYCHAIN_PASSWORD set, for a
@@ -45,6 +47,8 @@ fi
 # macOS can't import.
 OPENSSL=/usr/bin/openssl
 signing_key() { swift -suppress-warnings scripts/signing-key.swift "$@"; }
+# Full Disk Access keeps the requirement of the build that was allowed, even when it's turned off and on.
+ALLOW_AGAIN="run tccutil reset SystemPolicyAllFiles $(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Resources/Info.plist), or remove Teams Pulse from Full Disk Access with −, and add it again with +"
 
 if [[ $MODE == check ]]; then
     STATUS=0
@@ -62,7 +66,7 @@ fi
 if [[ $MODE == replace || $MODE == delete ]]; then
     signing_key delete "$NAME" "$KEYCHAIN"
     if [[ $MODE == delete ]]; then
-        echo "Builds are signed ad hoc now: give each new build Full Disk Access again."
+        echo "Builds are signed ad hoc now. To allow each new one, $ALLOW_AGAIN."
         exit 0
     fi
 else
@@ -126,6 +130,6 @@ else
     LEAF="$(printf '%s\n' "$CERTIFICATE" | "$OPENSSL" x509 -outform DER | shasum -a 1 | cut -d ' ' -f 1)"
     echo "Created \"$NAME\" in $KEYCHAIN (certificate leaf = H\"$LEAF\")."
     echo "No app may use its key without asking, and it can't be exported. Each build asks for your login"
-    echo "password so that codesign can sign with it: click Allow, never Always Allow. Give the next build"
-    echo "Full Disk Access; later builds keep it."
+    echo "password so that codesign can sign with it: click Allow, never Always Allow. To allow the next build,"
+    echo "$ALLOW_AGAIN; later builds keep the access."
 fi

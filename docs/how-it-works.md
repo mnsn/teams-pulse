@@ -163,7 +163,9 @@ signature that says how to recognize it again, and checks the running app agains
   [TN3127](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements)
   puts it this way: ad hoc signed code "has a DR but it's tied to that specific version of the code",
   so "macOS can't track this authorization across versions of your app". Every build loses Full
-  Disk Access, although System Settings may still show the switch on.
+  Disk Access, although System Settings may still show the switch on. macOS keeps the requirement of
+  the build you allowed, and turning the switch off and on keeps it too: remove Teams Pulse from the
+  list, or run `tccutil reset SystemPolicyAllFiles com.asaf.TeamsPulse`, and add it again.
 - Signed with a certificate, the requirement names the certificate instead:
   `identifier "com.asaf.TeamsPulse" and certificate leaf = H"<the certificate's hash>"`. A rebuilt
   app with different code hashes still satisfies it (`codesign -R=<requirement> --verify` passes), so
@@ -215,7 +217,7 @@ approved job can sign with it. That job checks that the signed app has the desig
 build job, sign with a throwaway certificate instead.
 
 Changing the certificate, or the bundle identifier, loses Full Disk Access once: remove Teams Pulse
-from the list and add it again. That's also what happens when a copy you built updates itself to a
+from the list (or reset its entry with `tccutil`, as above) and add it again. That's also what happens when a copy you built updates itself to a
 release.
 
 ### The hardened runtime and library validation
