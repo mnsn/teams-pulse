@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var onboarding = OnboardingController(store: store)
     private lazy var badgeMonitor = BadgeMonitor(store: store, settings: settings)
     private let summarizer = Summarizer()
+    private let updater = Updater()
     private var items: [ChatGroup: StatusItemController] = [:]
     private var cancellables: Set<AnyCancellable> = []
 
@@ -22,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for group in [ChatGroup.groups, .chats] {
             let item = StatusItemController(
                 group: group, store: store, settings: settings, loginItem: loginItem, onboarding: onboarding,
-                summarizer: summarizer
+                summarizer: summarizer, updater: updater
             )
             item.willShow = { [weak self] shown in
                 guard let self else { return }
@@ -46,6 +47,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         store.start()
         badgeMonitor.start()
+        // Only the app checks for updates, never the command-line modes or --render (see main.swift).
+        updater.start()
     }
 
     func applicationWillTerminate(_ notification: Notification) {

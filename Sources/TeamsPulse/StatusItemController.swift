@@ -16,7 +16,7 @@ final class StatusItemController: NSObject {
 
     init(
         group: ChatGroup, store: ConversationStore, settings: AppSettings, loginItem: LoginItem,
-        onboarding: OnboardingController, summarizer: Summarizer
+        onboarding: OnboardingController, summarizer: Summarizer, updater: Updater
     ) {
         self.group = group
         self.store = store
@@ -29,6 +29,7 @@ final class StatusItemController: NSObject {
                 .environmentObject(loginItem)
                 .environmentObject(onboarding)
                 .environmentObject(summarizer)
+                .environmentObject(updater)
         )
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host

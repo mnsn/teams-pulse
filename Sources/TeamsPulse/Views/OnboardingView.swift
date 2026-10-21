@@ -121,7 +121,7 @@ struct OnboardingView: View {
                 }
             }
 
-            Text("Teams Pulse finds your unread chats in the notifications that macOS keeps in Notification Center. macOS protects that database, so Teams Pulse needs Full Disk Access to read it. It only reads it, and nothing leaves your Mac: Teams Pulse makes no network connections.")
+            Text("Teams Pulse finds your unread chats in the notifications that macOS keeps in Notification Center. macOS protects that database, so Teams Pulse needs Full Disk Access to read it. It only reads it, and nothing about your chats leaves your Mac.")
                 .fixedSize(horizontal: false, vertical: true)
 
             if store.lostAccess {

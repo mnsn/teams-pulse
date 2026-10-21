@@ -149,7 +149,9 @@ anything it asks of you (`Summarizer` in the app, `SummaryPrompt` in `PulseCore`
 - Without Apple Intelligence (before macOS 26, on a Mac that can't run it, or with it turned off),
   the setting says why. An unsupported language, a refusal or a busy model shows a short note
   instead of a summary.
-- FoundationModels is linked weakly, so the app still opens on macOS 15.
+- FoundationModels is linked weakly, so the app still opens on macOS 15. Built with an SDK that
+  doesn't have it, such as Xcode 16's, the app leaves the summarizer out, and the setting says that
+  summaries need a build made with the macOS 26 SDK.
 
 ## Signing
 
@@ -169,12 +171,51 @@ signature that says how to recognize it again, and checks the running app agains
 
 `scripts/make-signing-identity.sh` creates that certificate, self-signed, for code signing only,
 valid for 10 years, in the login keychain. Nothing has to trust it: macOS matches the certificate
-itself. `scripts/build-app.sh` signs every build with it, with the hardened runtime and no
-timestamp (so signing makes no network request), and `scripts/check-app.sh` fails if a build's
+itself. `scripts/build-app.sh` signs every build with it (through `scripts/sign-app.sh`), with no
+timestamp, so signing makes no network request, and `scripts/check-app.sh` fails if a build's
 requirement names code hashes. The keychain item for the unread chats relies on the same signature.
 
+Releases are signed the same way, all with one certificate: the maintainer's, which only the release
+workflow's approved job gets, from the `release` environment's secrets. That job checks that the
+signed app has the designated requirement in `Resources/ReleaseRequirement.txt`, so a release can't
+quietly cost everyone their access. CI, and the release's build job, sign with a throwaway
+certificate instead (`scripts/ci-signing-identity.sh`).
+
 Changing the certificate, or the bundle identifier, loses Full Disk Access once: remove Teams Pulse
-from the list and add it again.
+from the list and add it again. That's also what happens when a copy you built updates itself to a
+release.
+
+### The hardened runtime and library validation
+
+Every build runs with the hardened runtime, so other processes can't use Teams Pulse's Full Disk
+Access by injecting code into it: macOS ignores `DYLD_` environment variables for it, such as
+`DYLD_INSERT_LIBRARIES`, and doesn't let debuggers attach.
+
+The hardened runtime also turns on library validation, which loads only libraries signed by Apple
+or by the app's own team. A self-signed certificate has no team, so macOS would refuse Sparkle even
+signed with the same certificate ("mapping process and mapped file (non-platform) have different
+Team IDs"). The app's one entitlement, `com.apple.security.cs.disable-library-validation` in
+`Resources/TeamsPulse.entitlements`, turns that check off. The cost: anything that can change the
+files inside the app could make it load other code, with its Full Disk Access, which is why
+[SECURITY.md](../SECURITY.md#how-the-app-is-signed) says to keep it in `/Applications`. A Developer
+ID certificate would make the entitlement unnecessary.
+
+## Updating the app
+
+Teams Pulse updates itself with [Sparkle](https://sparkle-project.org) 2, embedded as
+`Contents/Frameworks/Sparkle.framework`, without the XPC services that only sandboxed apps need.
+
+- **Only if you allow it.** Sparkle asks on the second launch whether to check automatically, and
+  then checks once a day. **Check for Updates…** checks right away. A build without `SUPublicEDKey`
+  in its `Info.plist` never checks, and has no update settings.
+- **What it fetches**: `appcast.xml` from
+  `https://github.com/mnsn/teams-pulse/releases/latest/download/`, and the zip that it names.
+  These are the app's only network requests. Its own code has no networking (`scripts/check-app.sh`
+  checks the symbols the binary imports), and Sparkle's anonymous system profiling stays off.
+- **What it accepts**: only an appcast and a zip signed with the project's EdDSA key, and it checks
+  the zip before unpacking it. [SECURITY.md](../SECURITY.md#how-updates-are-verified) has the
+  details.
+- **Full Disk Access survives**, because every release is signed with the same certificate.
 
 ## When the formats change
 

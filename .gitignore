@@ -11,6 +11,15 @@ build/
 # Default `--render` output. Renders of your own chats show private names and messages.
 render/
 
+# Signing keys never belong in the repository (see "The release keys" in CONTRIBUTING.md).
+*.p12
+*.pfx
+*.pem
+*.key
+*.keychain
+*.keychain-db
+private-key*
+
 # Editors and macOS
 .vscode/
 .idea/

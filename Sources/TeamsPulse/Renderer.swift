@@ -80,7 +80,8 @@ enum Renderer {
             .environmentObject(settings)
             .environmentObject(loginItem)
             .environmentObject(onboarding)
-            .environmentObject(summarizer))
+            .environmentObject(summarizer)
+            .environmentObject(Updater())) // never started: rendering doesn't check for updates
         host.appearance = appearance
         let window = NSWindow(contentRect: CGRect(x: -20_000, y: -20_000, width: 400, height: 300),
                               styleMask: .borderless, backing: .buffered, defer: false)

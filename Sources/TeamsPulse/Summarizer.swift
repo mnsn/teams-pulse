@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(FoundationModels)
 import FoundationModels
+#endif
 import PulseCore
 
 /// One-sentence summaries of chats, from Apple's on-device model. Never Private Cloud Compute: the
@@ -22,10 +24,14 @@ final class Summarizer: ObservableObject {
 
     /// Why summaries aren't available, or nil when they are.
     nonisolated static var unavailableReason: String? {
+        #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
             return OnDeviceModel.unavailableReason
         }
         return "Summaries need macOS 26 or later."
+        #else
+        return "This copy of Teams Pulse was built without summaries: they need the macOS 26 SDK."
+        #endif
     }
 
     /// The chat's summary, if it covers its current messages.
@@ -49,13 +55,18 @@ final class Summarizer: ObservableObject {
     }
 
     nonisolated static func summarize(prompt: String) async -> State {
+        #if canImport(FoundationModels)
         if #available(macOS 26.0, *) {
             return await OnDeviceModel.summarize(prompt)
         }
-        return .failed("Summaries need macOS 26 or later.")
+        #endif
+        return .failed(unavailableReason ?? "Summaries aren't available.")
     }
 }
 
+#if canImport(FoundationModels)
+// FoundationModels is newer than the deployment target, so it's linked weakly and the app still
+// opens on macOS 15. Built with an older SDK, there's no FoundationModels and no summaries.
 @available(macOS 26.0, *)
 private enum OnDeviceModel {
     static var unavailableReason: String? {
@@ -102,3 +113,4 @@ private enum OnDeviceModel {
         }
     }
 }
+#endif

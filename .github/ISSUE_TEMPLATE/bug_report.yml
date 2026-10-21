@@ -1,0 +1,53 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report!
+
+        **Never post anything from your real chats**: no chat or people's names, messages or chat IDs, and no screenshots of Teams Pulse or Teams that show them. They're private, and often confidential to your organization. Describe the problem in general terms, and share the `--diagnose` output asked for below, which describes only the structure of Teams' notifications. To show something on screen, reproduce it with the made-up chats of `make demo`.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead? Describe chats in general terms, such as "a group chat with 3 new messages".
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Someone sends me a message in a 1:1 chat while Teams Pulse is running
+        2. …
+  - type: input
+    id: pulse-version
+    attributes:
+      label: Teams Pulse version or commit
+      placeholder: 0.1.0, or a commit like abc1234
+    validations:
+      required: true
+  - type: input
+    id: teams-version
+    attributes:
+      label: Microsoft Teams version
+      description: '`mdls -raw -name kMDItemVersion "/Applications/Microsoft Teams.app"` prints it.'
+      placeholder: 26276.505.5234.9924
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+      placeholder: macOS 26.1, Apple silicon
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Click **Copy Diagnostics** in the app's gear menu and paste it here, or paste the output of `"/Applications/Teams Pulse.app/Contents/MacOS/TeamsPulse" --diagnose`. It describes Notification Center's database and Teams' notifications by structure only, without names, messages or IDs. Never paste the output of `--dump`, `--watch`, `--summaries` or `--json`, which shows your chats.
+      render: text

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/mnsn/teams-pulse/security/advisories/new
+    about: Please report security issues privately, not in a public issue.
+  - name: Problems with Microsoft Teams itself
+    url: https://support.microsoft.com/teams
+    about: Teams Pulse is an independent project. For Teams itself, contact Microsoft support or your IT department.

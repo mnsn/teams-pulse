@@ -13,6 +13,12 @@ The first version.
 - **Unread chats survive**: kept after Notification Center drops their notifications, and across
   restarts, encrypted on disk until they're read.
 - **Full Disk Access**: a window walks you through granting it, and notices when it's granted.
-- **Signing**: every build is signed with a self-signed certificate, so Full Disk Access survives
-  rebuilds.
-- **Private**: reads Notification Center's database read-only, and makes no network connections.
+- **Updates**: Teams Pulse updates itself, with [Sparkle](https://sparkle-project.org). The second
+  time you open it, it asks whether to check for updates automatically, once a day.
+  **Check for Updates…** in its settings checks right away. It installs only updates that come from
+  this project's GitHub releases and are signed with the project's key.
+- **Signing**: every build is signed with a certificate rather than ad hoc, and every release with
+  the same one, so Full Disk Access survives rebuilds and updates.
+- **Private**: reads Notification Center's database read-only. The only network requests are the
+  update checks and downloads, from GitHub. Nothing about your chats is sent.
+- A universal app for Apple silicon and Intel Macs with macOS 15 or later. Summaries need macOS 26.

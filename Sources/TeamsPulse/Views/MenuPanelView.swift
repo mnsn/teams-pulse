@@ -9,6 +9,7 @@ struct MenuPanelView: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var onboarding: OnboardingController
     @EnvironmentObject private var summarizer: Summarizer
+    @EnvironmentObject private var updater: Updater
 
     @LocalState private var contentHeight: CGFloat = 0
     @LocalState private var showRecent = false
@@ -121,6 +122,16 @@ struct MenuPanelView: View {
             }
             .buttonStyle(.borderless)
             Spacer()
+            if let version = updater.pendingVersion {
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    Label("Update Available", systemImage: "arrow.down.circle")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.tint)
+                .help("Teams Pulse \(version) is available")
+            }
             Menu {
                 SettingsMenuContent()
             } label: {

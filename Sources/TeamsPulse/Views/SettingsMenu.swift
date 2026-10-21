@@ -8,6 +8,7 @@ struct SettingsMenuContent: View {
     @EnvironmentObject private var settings: AppSettings
     @EnvironmentObject private var loginItem: LoginItem
     @EnvironmentObject private var onboarding: OnboardingController
+    @EnvironmentObject private var updater: Updater
 
     var body: some View {
         Picker("Keep Unread For", selection: $settings.keepUnread) {
@@ -36,6 +37,16 @@ struct SettingsMenuContent: View {
         }
 
         Divider()
+
+        if updater.isAvailable {
+            Button("Check for Updates…") { updater.checkForUpdates() }
+                .disabled(!updater.canCheckForUpdates)
+            Toggle("Check for Updates Automatically", isOn: Binding(
+                get: { updater.automaticallyChecks },
+                set: { updater.setAutomaticallyChecks($0) }
+            ))
+            Divider()
+        }
 
         if store.access != .granted {
             Button("Set Up Full Disk Access…") { onboarding.show() }

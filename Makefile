@@ -1,4 +1,4 @@
-.PHONY: build test app install uninstall run dump watch diagnose render demo-data demo demo-check screenshots icon signing-identity pppc-profile clean
+.PHONY: build test app package install uninstall run dump watch diagnose render demo-data demo demo-check screenshots icon signing-identity pppc-profile clean
 
 # With only the Command Line Tools installed, the compiler sometimes misses Swift Testing's macro
 # plugin (it lives in a subfolder), so point it there explicitly.
@@ -19,6 +19,10 @@ test:
 
 app:
 	./scripts/build-app.sh
+
+# What a release ships, in build/release: the universal app, checked and zipped, and its notes.
+package:
+	./scripts/package.sh
 
 install:
 	./scripts/build-app.sh --install
