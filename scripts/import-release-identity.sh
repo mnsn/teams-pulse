@@ -8,7 +8,7 @@ set -euo pipefail
 
 : "${RELEASE_CERTIFICATE_P12:?The release environment has no RELEASE_CERTIFICATE_P12 secret.}"
 : "${RELEASE_CERTIFICATE_PASSWORD:?The release environment has no RELEASE_CERTIFICATE_PASSWORD secret.}"
-NAME="${TEAMS_PULSE_SIGNING_IDENTITY:-Teams Pulse Signing}"
+NAME="${TEAMS_PULSE_SIGNING_IDENTITY:-Teams Pulse Release}"
 FOLDER="${1:-$(mktemp -d)}"
 KEYCHAIN="$FOLDER/teams-pulse-release.keychain-db"
 KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"

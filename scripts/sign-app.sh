@@ -1,7 +1,7 @@
 #!/bin/bash
-# Signs "Teams Pulse.app" from the inside out: Sparkle.framework, then the app, with the hardened
-# runtime. scripts/build-app.sh runs it for every build; the release workflow runs it again with the
-# release certificate, which only the approved release job holds.
+# Signs "Teams Pulse.app" from the inside out: Sparkle.framework (ad hoc), then the app, with the
+# hardened runtime. scripts/build-app.sh runs it for every build; the release workflow runs it again
+# with the release certificate, which only the approved release job holds.
 #   scripts/sign-app.sh <app> [--ad-hoc]
 # TEAMS_PULSE_SIGNING_IDENTITY names the certificate (default "Teams Pulse Signing");
 # TEAMS_PULSE_SIGNING_KEYCHAIN is a keychain to find it in, instead of the search list.
@@ -28,9 +28,12 @@ else
 fi
 
 # Sparkle's helpers (Autoupdate and Updater.app) run as their own processes and keep the signatures
-# they ship with. The framework is signed again, without its XPC services, with the app's identity.
+# they ship with. The framework is signed again, without its XPC services, ad hoc: with library
+# validation off (see Resources/TeamsPulse.entitlements), the app loads it whoever signed it, and the
+# app's own signature seals the framework's exact code. So codesign uses the certificate's key once per
+# build, and asks for the password once.
 if [[ -d "$FRAMEWORK" ]]; then
-    codesign --force "${SIGN[@]}" --preserve-metadata=identifier,entitlements,flags,runtime "$FRAMEWORK"
+    codesign --force --sign - --preserve-metadata=identifier,entitlements,flags,runtime "$FRAMEWORK"
 fi
 # The hardened runtime keeps other processes from injecting code into an app that holds Full Disk
 # Access (DYLD_* variables are ignored). See Resources/TeamsPulse.entitlements for library validation.

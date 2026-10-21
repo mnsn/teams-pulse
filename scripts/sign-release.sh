@@ -1,13 +1,14 @@
 #!/bin/bash
 # Signs a packaged release with the release certificate, in the release workflow's approved job:
-# unzips build/release/Teams-Pulse.zip, signs the app again with the certificate that
-# TEAMS_PULSE_SIGNING_IDENTITY and TEAMS_PULSE_SIGNING_KEYCHAIN name, checks it, and zips it again,
-# with its new SHA-256 in Teams-Pulse.zip.sha256 and notes.md.
+# unzips build/release/Teams-Pulse.zip, signs the app again with "Teams Pulse Release" (or the
+# certificate TEAMS_PULSE_SIGNING_IDENTITY names) from TEAMS_PULSE_SIGNING_KEYCHAIN, checks it, and
+# zips it again, with its new SHA-256 in Teams-Pulse.zip.sha256 and notes.md.
 #   scripts/sign-release.sh [release dir]   (default: build/release)
 # Every release must be signed with the same certificate: macOS ties Full Disk Access to the app's
 # designated requirement, which names it. So the result must match Resources/ReleaseRequirement.txt,
 # which scripts/make-release-keys.sh writes.
 set -euo pipefail
+export TEAMS_PULSE_SIGNING_IDENTITY="${TEAMS_PULSE_SIGNING_IDENTITY:-Teams Pulse Release}"
 cd "$(dirname "$0")/.."
 
 OUT="${1:-build/release}"

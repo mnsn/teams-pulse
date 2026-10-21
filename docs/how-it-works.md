@@ -175,15 +175,39 @@ itself. `scripts/build-app.sh` signs every build with it (through `scripts/sign-
 timestamp, so signing makes no network request, and `scripts/check-app.sh` fails if a build's
 requirement names code hashes. The keychain item for the unread chats relies on the same signature.
 
-Releases are signed the same way, all with one certificate: the maintainer's, which only the release
-workflow's approved job gets, from the `release` environment's secrets. That job checks that the
-signed app has the designated requirement in `Resources/ReleaseRequirement.txt`, so a release can't
-quietly cost everyone their access. CI, and the release's build job, sign with a throwaway
-certificate instead (`scripts/ci-signing-identity.sh`).
+### Who may use the signing key
+
+Matching a certificate is only as strong as the private key behind it: anything that can sign with
+the key can sign itself as `com.asaf.TeamsPulse`, satisfy the requirement, and get the Full Disk
+Access the user gave Teams Pulse. So no app may use the key without asking:
+
+- `security import` can't make such a key. With `-T /usr/bin/codesign`, codesign may use the key
+  silently; without it, `/usr/bin/security`, the app that imported it, may. Either way, any program
+  running as the user could have it sign. `scripts/signing-key.swift` imports the key with an access
+  list that trusts no app, so codesign asks for the login password every time.
+- **Always Allow** in that prompt would add codesign to the list. `scripts/build-app.sh` reads the
+  list before every build (without prompting) and refuses to sign while any app is on it.
+  `scripts/make-signing-identity.sh --replace` swaps such a certificate for a new one.
+- Sparkle.framework is signed ad hoc, so each build uses the key once, and asks once. With library
+  validation off (below), the app loads the framework whoever signed it, and the app's own signature
+  records the framework's exact code hash.
+- The certificate and its key are made in memory and reach the keychain through a pipe, never a file.
+
+Only CI's throwaway keychains (`scripts/ci-signing-identity.sh`) let codesign use their key without
+asking, since nothing could answer a prompt there.
+
+### Releases
+
+Releases are signed the same way, all with one certificate, **Teams Pulse Release**, which isn't on
+any Mac. `scripts/make-release-keys.sh` makes it in memory, once, for the `release` environment's
+secrets and the maintainer's password manager, so only the release workflow's approved job can sign
+with it. That job checks that the signed app has the designated requirement in
+`Resources/ReleaseRequirement.txt`, so a release can't quietly cost everyone their access. CI, and
+the release's build job, sign with a throwaway certificate instead.
 
 Changing the certificate, or the bundle identifier, loses Full Disk Access once: remove Teams Pulse
 from the list and add it again. That's also what happens when a copy you built updates itself to a
-release.
+release, or when the maintainer installs a release over their own build.
 
 ### The hardened runtime and library validation
 
@@ -192,10 +216,10 @@ Access by injecting code into it: macOS ignores `DYLD_` environment variables fo
 `DYLD_INSERT_LIBRARIES`, and doesn't let debuggers attach.
 
 The hardened runtime also turns on library validation, which loads only libraries signed by Apple
-or by the app's own team. A self-signed certificate has no team, so macOS would refuse Sparkle even
-signed with the same certificate ("mapping process and mapped file (non-platform) have different
-Team IDs"). The app's one entitlement, `com.apple.security.cs.disable-library-validation` in
-`Resources/TeamsPulse.entitlements`, turns that check off. The cost: anything that can change the
+or by the app's own team. A self-signed certificate has no team, so macOS would refuse Sparkle,
+even signed with the same certificate ("mapping process and mapped file (non-platform) have
+different Team IDs"). The app's one entitlement, `com.apple.security.cs.disable-library-validation`
+in `Resources/TeamsPulse.entitlements`, turns that check off. The cost: anything that can change the
 files inside the app could make it load other code, with its Full Disk Access, which is why
 [SECURITY.md](../SECURITY.md#how-the-app-is-signed) says to keep it in `/Applications`. A Developer
 ID certificate would make the entitlement unnecessary.

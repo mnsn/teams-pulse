@@ -105,14 +105,16 @@ make signing-identity   # once per Mac: the certificate every build is signed wi
 make install            # builds "Teams Pulse.app", copies it to ~/Applications and opens it
 ```
 
-Then give it Full Disk Access as above: it's in `~/Applications` (press ⌘⇧G in the file dialog to
-type the folder). To remove it, run `make uninstall` and remove it from the Full Disk Access list.
+Each build asks for your login password so that `codesign` can sign it with that certificate: click
+**Allow**, never **Always Allow** ([why](#why-the-signing-certificate)). Then give it Full Disk Access
+as above: it's in `~/Applications` (press ⌘⇧G in the file dialog to type the folder). To remove it,
+run `make uninstall` and remove it from the Full Disk Access list.
 
 A copy you build updates itself too, to the release builds, unless you turn off
 **Check for Updates Automatically** and build each new version yourself. Releases are signed with
 the project's certificate rather than yours, so after that first update, macOS asks for Full Disk
 Access again: remove Teams Pulse from the list and add it again. macOS may also ask once whether
-Teams Pulse can use its keychain item: click **Always Allow**.
+Teams Pulse can use its own keychain item: there, **Always Allow** is fine.
 
 ### Why the signing certificate?
 
@@ -120,8 +122,17 @@ macOS ties Full Disk Access to the app's code signature. An ad-hoc signed app (t
 build) is identified by the hashes of its code, so every rebuild looks like a new app and loses
 access. `make signing-identity` creates a self-signed certificate, **Teams Pulse Signing**, in your
 login keychain, and every build is signed with it, so each new build keeps the access you granted.
-The first build may ask whether `codesign` may use the key: choose **Always Allow**. Releases work
-the same way, with the project's own certificate, which is why updates keep the access.
+
+That also makes the certificate's key as powerful as the access: any program that can sign with it
+can sign itself as Teams Pulse, and get the Full Disk Access you gave Teams Pulse. So no app may use
+the key without asking, not even `codesign`, and each build asks for your password. **Always Allow**
+would let any program running as you use it silently, so `make app` refuses to sign with a key that
+some app may use without asking. If it says so, for example about a certificate made before
+October 21, 2026, replace the certificate with `scripts/make-signing-identity.sh --replace`, and
+give the next build Full Disk Access once more.
+
+Releases are signed the same way, with a certificate of the project's own that only GitHub's release
+workflow can use, which is why updates keep the access.
 [How it works](docs/how-it-works.md#signing) has the details.
 
 ### Teams' notifications

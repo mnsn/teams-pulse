@@ -33,6 +33,20 @@ if ! $AD_HOC && ! security find-certificate -c "$IDENTITY" ${KEYCHAIN:+"$KEYCHAI
     echo "(Or pass --ad-hoc, but then Full Disk Access doesn't survive the next build.)" >&2
     exit 1
 fi
+# If some app may use the key without asking, any program running as you could sign itself as Teams
+# Pulse with it, and get its Full Disk Access. A throwaway keychain of its own (CI) is the exception.
+if ! $AD_HOC && [[ -z "$KEYCHAIN" ]]; then
+    STATUS=0
+    swift -suppress-warnings scripts/signing-key.swift check "$IDENTITY" || STATUS=$?
+    if [[ $STATUS -eq 3 ]]; then
+        echo "So any program running as you could sign itself as Teams Pulse, and get its Full Disk Access." >&2
+        echo "Replace the certificate with one that every app has to ask to use, then build again:" >&2
+        echo "  scripts/make-signing-identity.sh --replace" >&2
+        exit 1
+    elif [[ $STATUS -ne 0 ]]; then
+        echo "warning: couldn't check which apps may use the key of \"$IDENTITY\"." >&2
+    fi
+fi
 
 BUILD_FLAGS=(-c release)
 if $UNIVERSAL; then
@@ -86,6 +100,10 @@ if $AD_HOC; then
     echo "warning: signing ad hoc. Full Disk Access granted to this build won't apply to the next one." >&2
     ./scripts/sign-app.sh "$APP" --ad-hoc
 else
+    if [[ -z "$KEYCHAIN" ]]; then
+        echo "Signing with \"$IDENTITY\": macOS asks for your login password so that codesign can use its key." >&2
+        echo "Click Allow, never Always Allow." >&2
+    fi
     ./scripts/sign-app.sh "$APP"
 fi
 REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | sed -n 's/^#* *designated => //p')"

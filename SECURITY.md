@@ -47,6 +47,12 @@ made it, and the app isn't notarized.
   malware running as you, could make it load other code and use its Full Disk Access. Keep the app
   in `/Applications`. A Developer ID would let the app turn library validation back on.
 - `scripts/check-app.sh` checks each build for these settings, and CI runs it.
+- Anything that can sign with the certificate's key can sign itself as Teams Pulse and inherit its
+  Full Disk Access. So the release certificate, **Teams Pulse Release**, is on no Mac: it's made in
+  memory, once, and kept only in the `release` environment's secrets and the maintainer's password
+  manager. A certificate for building from source (`make signing-identity`) trusts no app to use its
+  key, not even codesign, which asks for the password every time, and `make app` refuses to sign
+  with a key that some app may use without asking.
 
 ## How updates are verified
 
@@ -62,14 +68,15 @@ update from the same release.
   signature before it even unpacks it (`SUVerifyUpdateBeforeExtraction`).
 - The EdDSA signature is the main protection. The certificate is what keeps Full Disk Access.
 
-The private keys of both are kept only by the maintainer (in the Keychain of their Mac and in a
-password manager) and in the secrets of the `release` environment in GitHub Actions:
-`RELEASE_CERTIFICATE_P12` and `RELEASE_CERTIFICATE_PASSWORD` for the certificate, and
-`SPARKLE_PRIVATE_KEY` for the update signing key. Only the job that signs a release can read them,
-and the environment waits for a maintainer to approve each release. That job deletes its copy of the
-certificate right after signing. Before publishing, it checks that the certificate is the one every
-release uses (`Resources/ReleaseRequirement.txt`) and that the signatures match the public key in
-`Info.plist`.
+The private keys of both exist only in the maintainer's password manager and in the secrets of the
+`release` environment in GitHub Actions: `RELEASE_CERTIFICATE_P12` and
+`RELEASE_CERTIFICATE_PASSWORD` for the certificate, and `SPARKLE_PRIVATE_KEY` for the update signing
+key. `scripts/make-release-keys.sh` makes them in memory, so they're never written to a file or a
+keychain, where any program running as the maintainer could use them. Only the job that signs a
+release can read the secrets, and the environment waits for a maintainer to approve each release.
+That job deletes its copy of the certificate right after signing. Before publishing, it checks that
+the certificate is the one every release uses (`Resources/ReleaseRequirement.txt`) and that the
+signatures match the public key in `Info.plist`.
 
 If the update signing key were lost, users would have to download a new version by hand once,
 because the app can't accept an update signed with a different key. If the certificate were lost, a
