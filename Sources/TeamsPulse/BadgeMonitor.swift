@@ -2,10 +2,10 @@ import AppKit
 import Combine
 import PulseCore
 
-/// Watches Teams' dock badge while **Mark All Read When Teams' Badge Clears** is on. `lsappinfo` reads
-/// it from Launch Services without any permission; it's checked every 5 seconds while Teams runs, and
-/// whenever Teams comes to the front or leaves it. Only a badge seen to disappear within one Teams
-/// process counts (see `ConversationStore.dockBadgeChanged`).
+/// Watches Teams' dock badge while **Mark All Read When Teams' Badge Clears** is on (the default).
+/// `lsappinfo` reads it from Launch Services without any permission; it's checked every 5 seconds while
+/// Teams runs, and whenever Teams comes to the front or leaves it. Only a badge seen to disappear, and
+/// stay gone, within one Teams process counts (see `ConversationStore.dockBadgeChanged`).
 @MainActor
 final class BadgeMonitor {
     private let store: ConversationStore
@@ -72,7 +72,7 @@ final class BadgeMonitor {
         let process = teams.processIdentifier
         isReading = true
         queue.async { [weak self] in
-            let output = Self.lsappinfo(bundleIdentifier)
+            let reading = DockBadge.read(bundleIdentifier: bundleIdentifier)
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     guard let self else { return }
@@ -82,26 +82,9 @@ final class BadgeMonitor {
                         self.store.resetDockBadge()
                         return
                     }
-                    self.store.dockBadgeChanged(output.flatMap { DockBadge.parse(lsappinfo: $0) }, teamsProcess: process)
+                    self.store.dockBadgeChanged(reading, teamsProcess: process)
                 }
             }
         }
-    }
-
-    private nonisolated static func lsappinfo(_ bundleIdentifier: String) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/lsappinfo")
-        process.arguments = ["info", "-only", "StatusLabel", "-app", bundleIdentifier]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return process.terminationStatus == 0 ? String(decoding: data, as: UTF8.self) : nil
     }
 }

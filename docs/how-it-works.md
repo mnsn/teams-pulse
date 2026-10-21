@@ -28,7 +28,8 @@ tells them apart. No field holds a link, so Teams Pulse builds one (see
 Notification Center keeps a limited number of notifications per app: 100 for Teams on the Mac this
 was built on, about two days' worth, half of them channel posts. It drops old ones as new ones
 arrive, and nothing in the database records whether you've read a chat: `app.badge` stays empty,
-and `presented` and `style` never change.
+and `presented` and `style` don't track it. Reading a chat in Teams doesn't remove its notifications
+either (Teams 26276 on macOS 27): they stay until Notification Center makes room, or you clear them.
 
 Teams Pulse never changes the database. It opens it with a read-only SQLite connection, for a few
 milliseconds per read, and never copies it. Like any SQLite reader, it takes brief shared locks and
@@ -50,13 +51,17 @@ The [table in the README](../README.md#what-counts-as-unread) lists the rules. I
   Pulse keeps them, although Notification Center no longer has them. Otherwise their chat is read up
   to them.
 - **Expiry.** Unread messages older than **Keep Unread For** count as read, since Teams Pulse can't
-  see you read a chat in Teams.
-- **Teams' dock badge**, if you turn on **Mark All Read When Teams' Badge Clears**: `lsappinfo info
-  -only StatusLabel -app com.microsoft.teams2` reads it every 5 seconds while Teams runs, without any
-  permission. When a badge Teams Pulse saw disappears, in the same Teams process, everything delivered
-  until then counts as read. No badge says nothing by itself: not while Teams isn't running, and not
-  in the first minute after it starts, before it has set one. It's off by default until it's clear
-  that the badge tracks unread chats.
+  see which chat you read in Teams.
+- **Teams' dock badge**, while **Mark All Read When Teams' Badge Clears** is on, as it is by default.
+  Reading a chat in Teams leaves its notifications alone, but the badge gets smaller as you read, and
+  disappears once nothing in Teams is unread. `lsappinfo info -long -only StatusLabel -app
+  com.microsoft.teams2` reads it every 5 s while Teams runs, and when Teams comes to the front or
+  leaves it, without any permission. It needs `-long`: without it, macOS 27's `lsappinfo` leaves
+  `StatusLabel` out. When a badge Teams Pulse saw disappears, in the same Teams process, and is still
+  gone 10 s later, everything delivered until it went counts as read. The wait passes over a badge
+  that's back right away, as it might be while Teams reloads. No badge says nothing by itself: not
+  while Teams isn't running, and not in the first minute after it starts, before it has set one. A
+  badge that only gets smaller doesn't say which chat you read, so it changes nothing.
 - **Launching again.** Notifications delivered after the last read Teams Pulse took in count as
   unread. It records when that read started every minute and when it quits, so a stretch when it
   couldn't read the database never counts as seen.
@@ -95,12 +100,15 @@ replaced, so the kqueue watch can move to the new file. `db` itself is deliberat
 watching: closing an extra file descriptor on a SQLite database drops the process's SQLite locks.
 
 Notification Center writes for every app, so most writes change nothing for Teams; Teams Pulse
-publishes only when Teams' notifications changed. Three timers exist, and none drives updates:
+publishes only when Teams' notifications changed. Four timers exist, and none drives updates:
 
 - a 15 s tick that refreshes relative times and expires old unread messages,
-- a 60 s safety rescan that catches anything missed, for example after the Mac wakes from sleep, and
+- a 60 s safety rescan that catches anything missed, for example after the Mac wakes from sleep,
 - while Teams Pulse can't read the database, a check for access: every 2 s while the Full Disk
-  Access window is open, every 30 s otherwise.
+  Access window is open, every 30 s otherwise, and
+- while **Mark All Read When Teams' Badge Clears** is on, as it is by default, a 5 s check of Teams'
+  dock badge, which runs `lsappinfo` only while Teams runs (see
+  [Deciding what's unread](#deciding-whats-unread)).
 
 ## Opening a chat
 
@@ -270,7 +278,8 @@ Both formats are undocumented, so every read is checked:
 
 `--diagnose` and **Copy Diagnostics** describe all of this by structure only: table and field names,
 counts, and the shapes of values, such as `<oneOnOne ID>`, `<13-digit>` or
-`json {actionType: view, messageId: <13-digit>, userContextId: <guid>}`.
+`json {actionType: view, messageId: <13-digit>, userContextId: <guid>}`. They also show Teams' dock
+badge as Teams Pulse reads it.
 
 ## Why not Microsoft Graph or a server?
 

@@ -9,6 +9,8 @@ The first version.
 - **Lists**: each unread chat with its latest message, how long ago it arrived and how many are
   unread, plus read chats from the last day under Recent.
 - **One click to a chat**: opens it in Teams at its oldest unread message.
+- **Read in Teams**: once you've read everything in Teams and its dock badge has disappeared, every
+  chat counts as read.
 - **Summaries**: a one-sentence summary of a chat on request, from Apple's on-device model.
 - **Unread chats survive**: kept after Notification Center drops their notifications, and across
   restarts, encrypted on disk until they're read.

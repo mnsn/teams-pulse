@@ -68,7 +68,7 @@ Sources/PulseCore/      the engine; UI-free, and fully tested
   UnreadStore           the encrypted unread chats and the state file
   FormatCheck           how much of what's stored could be read
   Diagnostics           the structure-only report
-  DockBadge             parses Teams' dock badge from lsappinfo
+  DockBadge             reads Teams' dock badge with lsappinfo, and tells when it has cleared
   FileEventStream       FSEvents wrapper
   FileWriteWatcher      kqueue watcher for the SQLite WAL file
   NotificationEngine    wires the reading together and publishes snapshots

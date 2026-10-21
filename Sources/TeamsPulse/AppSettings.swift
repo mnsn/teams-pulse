@@ -53,7 +53,8 @@ final class AppSettings: ObservableObject {
     @Published var showPreviews: Bool {
         didSet { defaults.set(showPreviews, forKey: Key.showPreviews) }
     }
-    /// Marks everything read when Teams' dock badge disappears. Off until it's known to track unread chats.
+    /// Marks everything read when Teams' dock badge disappears: reading a chat in Teams leaves its
+    /// notifications in Notification Center, but takes it off Teams' badge.
     @Published var clearWithDockBadge: Bool {
         didSet { defaults.set(clearWithDockBadge, forKey: Key.clearWithDockBadge) }
     }
@@ -66,7 +67,7 @@ final class AppSettings: ObservableObject {
         self.defaults = defaults
         keepUnread = KeepUnread.saved(in: defaults)
         showPreviews = defaults.object(forKey: Key.showPreviews) as? Bool ?? true
-        clearWithDockBadge = defaults.bool(forKey: Key.clearWithDockBadge)
+        clearWithDockBadge = defaults.object(forKey: Key.clearWithDockBadge) as? Bool ?? true
         showSummaries = defaults.object(forKey: Key.showSummaries) as? Bool ?? true
     }
 

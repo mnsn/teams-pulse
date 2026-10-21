@@ -45,14 +45,17 @@ Notification Center doesn't record what you've read, so Teams Pulse decides:
 | **Unread** | Teams posts a notification for a new message, while Teams Pulse runs or while it doesn't |
 | **Read** | You open it from Teams Pulse, or choose **Mark as Read** or **Mark All Read** |
 | | You click or clear its notification in Notification Center |
+| | You've read everything in Teams, so its dock badge disappears (see below) |
 | | Its newest unread message is older than **Keep Unread For** (1 day by default) |
-| | Optionally, Teams' dock badge disappears (see [Settings](#settings)) |
 
 Reactions to your messages and channel posts aren't unread chats, so they aren't counted. Read chats
 stay under **Recent** for a day.
 
-Teams Pulse can't see you read a chat in Teams itself, unless that removes its notifications or
-clears Teams' dock badge. **Keep Unread For** and **Mark All Read** cover the rest.
+Reading a chat in Teams itself leaves its notifications in Notification Center, so Teams Pulse can't
+tell which chat you read there. But Teams' dock badge disappears once nothing in Teams is unread, and
+when it has been gone for 10 seconds, every chat counts as read. A chat you read in Teams while
+something else there is still unread stays in the list until **Keep Unread For** runs out, or you
+mark it read.
 
 ## Install
 
@@ -144,7 +147,8 @@ has the details.
 Teams Pulse sees only what Teams sends to Notification Center, so check that:
 
 - **System Settings › Notifications › Microsoft Teams** allows notifications, with
-  **Show in Notification Center** on.
+  **Show in Notification Center** on. Keep **Badge application icon** on too: Teams Pulse watches
+  Teams' dock badge to tell when you've read everything in Teams.
 - In Teams' own settings, under **Notifications and activity**, chat notifications are on.
 
 Chats you muted, and messages that arrive while Teams' own status is **Do not disturb** or while
@@ -160,7 +164,7 @@ Open the gear menu in either list.
 | Keep Unread For | 4 hours, 1 day (default), 3 days, until I read it |
 | Show Message Previews | on/off: off shows only how many messages are new, for screen sharing |
 | Summarize with Apple Intelligence | on/off: the ✨ button on each chat, while previews are shown |
-| Mark All Read When Teams' Badge Clears | off by default: when Teams' dock badge disappears, everything counts as read |
+| Mark All Read When Teams' Badge Clears | on (default)/off: once Teams' dock badge has been gone for 10 seconds, every chat counts as read |
 | Launch at Login | on/off |
 | Check for Updates Automatically | on/off (once a day) |
 
@@ -175,8 +179,8 @@ database's structure, without names, messages or IDs, for an issue report.
   version when you install it. GitHub sees your IP address and the versions of Teams Pulse and of
   [Sparkle](https://sparkle-project.org), the updater it uses. The app's own code has no networking
   at all.
-- **It only reads** Notification Center's database, with a read-only connection, and never changes
-  it.
+- **It only reads**: Notification Center's database, with a read-only connection that never changes
+  it, and Teams' dock badge.
 - **Summaries are made on your Mac**, by Apple's on-device model, never Apple's Private Cloud
   Compute, and are kept in memory only.
 - **On disk**, it keeps only your unread chats (the chat's name, and the unread messages' sender and

@@ -11,6 +11,7 @@ public enum Diagnostics {
         ]
         let access = DatabaseAccess.check(paths.database)
         lines.append("Database: \(paths.isSystemDatabase ? "Notification Center's" : "overridden by \(NotificationPaths.databaseVariable)"), access \(access.rawValue)")
+        lines.append("Teams' dock badge, from lsappinfo: \(dockBadge())")
         guard access == .granted else { return lines.joined(separator: "\n") }
         do {
             lines += describe(try NotificationDatabase.load(at: paths.database))
@@ -77,6 +78,19 @@ public enum Diagnostics {
         case .partlyUnreadable(let unreadable, let total): return "\(unreadable) of \(total) unrecognized"
         case .unrecognized(let total): return "none of \(total) recognized"
         }
+    }
+
+    /// What Teams Pulse sees of Teams' dock badge, which tells it when everything was read.
+    private static func dockBadge() -> String {
+        for identifier in NotificationDatabase.teamsBundleIdentifiers {
+            switch DockBadge.read(bundleIdentifier: identifier) {
+            case .count(let count): return "\(count) (\(identifier))"
+            case .mark: return "a mark (\(identifier))"
+            case .noBadge: return "none (\(identifier))"
+            case nil: continue
+            }
+        }
+        return "nothing to read (Teams isn't running, or lsappinfo's output changed)"
     }
 
     /// Field names as they are, unless they look like an ID rather than a field name.

@@ -196,14 +196,16 @@ final class ConversationStore: ObservableObject {
         recompute()
     }
 
-    /// With **Mark All Read When Teams' Badge Clears** on, a badge seen to disappear, in the same Teams
-    /// process, reads everything. No badge right after Teams starts, or with no reading at all, says
-    /// nothing. Nil means `lsappinfo` had nothing to say.
+    /// With **Mark All Read When Teams' Badge Clears** on, a badge seen to disappear, and stay gone for
+    /// `DockBadgeTracker.confirmation`, in the same Teams process, reads everything delivered until it
+    /// went: Teams has nothing unread. No badge right after Teams starts, or with no reading at all,
+    /// says nothing. Nil means `lsappinfo` had nothing to say.
     func dockBadgeChanged(_ reading: DockBadge?, teamsProcess: pid_t) {
-        let cleared = badge.update(reading, process: teamsProcess)
-        guard cleared, settings.clearWithDockBadge, hasApplied else { return }
+        guard let clearedAt = badge.update(reading, process: teamsProcess, at: Date()), settings.clearWithDockBadge,
+              hasApplied
+        else { return }
         Log.app.info("Teams' dock badge cleared; marking everything read")
-        tracker.markEverythingRead(at: Date())
+        tracker.markEverythingRead(at: clearedAt)
         recompute()
     }
 

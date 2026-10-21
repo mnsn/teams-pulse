@@ -1,8 +1,9 @@
 import Foundation
 
-/// Teams' dock badge, as `lsappinfo info -only StatusLabel -app com.microsoft.teams2` reports it:
-/// `"StatusLabel"={ "label"="3" }` while there's a badge, a line without a label when the app runs
-/// without one, and nothing at all when the app isn't running.
+/// Teams' dock badge, as `lsappinfo info -long -only StatusLabel -app com.microsoft.teams2` reports it:
+/// `"StatusLabel"={ "label"="3" }` while there's a badge; `"label"=kCFNULL`, or only the app's
+/// `"LSASN"=…` line, when the app runs without one; and nothing at all when the app isn't running.
+/// Without `-long`, macOS 27's `lsappinfo` leaves `StatusLabel` out, so no badge would ever show.
 public enum DockBadge: Sendable, Equatable {
     case noBadge
     case count(Int)
@@ -17,44 +18,90 @@ public enum DockBadge: Sendable, Equatable {
         }
     }
 
-    /// Nil when the output says nothing, as when the app isn't running: that's no news about the badge.
+    /// Nil when the output says nothing about the badge, as when the app isn't running, or in a format
+    /// without `StatusLabel`: that's no news about the badge.
     public static func parse(lsappinfo output: String) -> DockBadge? {
-        if output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
-        guard let match = output.firstMatch(of: /"label"\s*=\s*"([^"]*)"/) else { return .noBadge }
-        let label = match.1.trimmingCharacters(in: .whitespaces)
-        if label.isEmpty { return .noBadge }
-        if let count = Int(label) { return .count(count) }
-        return .mark
+        if let match = output.firstMatch(of: /"label"\s*=\s*"([^"]*)"/) {
+            let label = match.1.trimmingCharacters(in: .whitespaces)
+            if label.isEmpty { return .noBadge }
+            if let count = Int(label) { return .count(count) }
+            return .mark
+        }
+        // The app runs (it has an ASN), without a badge, or with one it took away (`kCFNULL`).
+        if output.contains("\"StatusLabel\"=") || output.contains("\"LSASN\"=") { return .noBadge }
+        return nil
+    }
+
+    /// The `lsappinfo` arguments that read an app's badge.
+    public static func lsappinfoArguments(bundleIdentifier: String) -> [String] {
+        ["info", "-long", "-only", "StatusLabel", "-app", bundleIdentifier]
+    }
+
+    /// Reads an app's dock badge with `lsappinfo`, which needs no permission. Nil when there's nothing
+    /// to read, as when the app isn't running. Waits for `lsappinfo`, so call it off the main thread.
+    public static func read(bundleIdentifier: String) -> DockBadge? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/lsappinfo")
+        process.arguments = lsappinfoArguments(bundleIdentifier: bundleIdentifier)
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        return parse(lsappinfo: String(decoding: data, as: UTF8.self))
     }
 }
 
-/// Tells when Teams' dock badge was seen to clear. Only a badge that was there, then gone, in the same
-/// Teams process counts: no badge right after Teams starts, or no reading at all, says nothing.
+/// Tells when Teams' dock badge cleared. Only a badge that was there, then stayed gone for
+/// `confirmation`, in the same Teams process, counts. No badge right after Teams starts, no reading at
+/// all, or a badge that's back within `confirmation` (as it might be while Teams reloads) says nothing.
 public struct DockBadgeTracker: Sendable {
+    /// How long a badge must stay gone to count.
+    public let confirmation: TimeInterval
     private var last: DockBadge?
     private var process: Int32?
+    /// When the first reading without the badge was taken, until that's reported or the badge is back.
+    private var clearedAt: Date?
 
-    public init() {}
+    public init(confirmation: TimeInterval = 10) {
+        self.confirmation = confirmation
+    }
 
-    /// Takes in a reading (nil when there was nothing to read) from the Teams process `process`, and
-    /// returns whether the badge just cleared.
-    public mutating func update(_ badge: DockBadge?, process: Int32) -> Bool {
+    /// Takes in a reading taken at `date` (nil when there was nothing to read) from the Teams process
+    /// `process`. Once the badge has stayed gone for `confirmation`, returns when it was first seen gone:
+    /// everything delivered until then was read. Each badge that clears is reported once.
+    public mutating func update(_ badge: DockBadge?, process: Int32, at date: Date) -> Date? {
         guard let badge else {
             reset()
-            return false
+            return nil
         }
         if self.process != process {
+            reset()
             self.process = process
-            last = nil
         }
         defer { last = badge }
-        guard badge.isClear, let last else { return false }
-        return !last.isClear
+        guard badge.isClear else {
+            clearedAt = nil
+            return nil
+        }
+        if let last, !last.isClear {
+            clearedAt = date
+        }
+        guard let cleared = clearedAt, date.timeIntervalSince(cleared) >= confirmation else { return nil }
+        clearedAt = nil
+        return cleared
     }
 
     /// Teams started or quit: its badge starts over.
     public mutating func reset() {
         last = nil
         process = nil
+        clearedAt = nil
     }
 }
