@@ -1,8 +1,7 @@
 #!/bin/bash
 # Creates a throwaway keychain holding a throwaway "Teams Pulse Signing" certificate, for CI and for
-# trying the build without your own certificate, and prints the keychain's path. Its key is open to
-# codesign, so that nothing asks for a password: don't give a build signed with it Full Disk Access.
-# Build with it:
+# make package on your Mac, and prints the keychain's path. Its key is open to codesign, so that nothing
+# asks for a password: don't give a build signed with it Full Disk Access. Build with it:
 #   export TEAMS_PULSE_SIGNING_KEYCHAIN="$(scripts/ci-signing-identity.sh)"
 #   make package
 # Delete it afterwards with `security delete-keychain <path>`. Releases are never signed with it:

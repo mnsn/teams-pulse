@@ -3,8 +3,9 @@ import PulseCore
 import Security
 
 /// Keeps the key that seals the saved unread chats in the login keychain. The item's access list
-/// trusts this app by its code signature, which is why every build must be signed with the same
-/// certificate (see scripts/make-signing-identity.sh).
+/// trusts this app by its code signature, so macOS may ask whether a build with another signature,
+/// such as each new ad-hoc build, may use it. Declined, the saved chats are left alone
+/// (`UnreadCache.Load.keyUnavailable`).
 struct KeychainKeyStore: KeyStore {
     var service = "com.asaf.TeamsPulse"
     var account = "unread-chats-key"

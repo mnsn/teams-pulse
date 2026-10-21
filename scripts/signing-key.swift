@@ -1,8 +1,8 @@
-// Imports and checks the private key of the certificate that builds are signed with, for
-// scripts/make-signing-identity.sh and scripts/build-app.sh. macOS ties Teams Pulse's Full Disk Access
-// to that certificate, so any app that may use the key without asking could sign itself as Teams Pulse
-// and get the access. That's why the key trusts no app, not even codesign: codesign asks for your
-// login password each time it signs.
+// Imports, checks and deletes the private key of the certificate that builds can be signed with
+// (make signing-identity), for scripts/make-signing-identity.sh and scripts/build-app.sh. macOS ties
+// Teams Pulse's Full Disk Access to that certificate, so any app that may use the key without asking
+// could sign itself as Teams Pulse and get the access. That's why the key trusts no app, not even
+// codesign, which asks for your login password each time it signs, and why it can't be exported.
 //
 //   swift scripts/signing-key.swift import <keychain> <name> [--trust <app>]
 //       Imports a PKCS #12 identity: its password on the first line of standard input, then the
@@ -10,8 +10,12 @@
 //       (CI) only.
 //   swift scripts/signing-key.swift check <name> [keychain]
 //       Fails with status 3 if any app may use the key of the certificate named <name> without
-//       asking, and names them; with status 1 if there's no such certificate. It reads only the key's
-//       access list, with user interaction off, so macOS never asks anything.
+//       asking, and names them; with status 4 if there's no such certificate; with another status if
+//       it can't tell. It reads only the key's access list, with user interaction off, so macOS never
+//       asks anything.
+//   swift scripts/signing-key.swift delete <name> <keychain>
+//       Deletes each certificate named exactly <name> from the keychain, with its private key, one item
+//       at a time, and checks that they're gone. Nothing else is touched.
 import Foundation
 import Security
 
@@ -48,14 +52,17 @@ func importIdentity(into path: String, name: String, trusting apps: [String]) ->
         fail("can't create the key's access list")
     }
 
+    // Without kSecAttrIsExtractable, the key can't leave the keychain, even with the password.
+    let keyAttributes = [kSecAttrIsPermanent, kSecAttrIsSensitive] as CFArray
     var parameters = SecItemImportExportKeyParameters()
     parameters.version = UInt32(SEC_KEY_IMPORT_EXPORT_PARAMS_VERSION)
     parameters.passphrase = Unmanaged<AnyObject>.passUnretained(passphrase)
     parameters.accessRef = Unmanaged.passUnretained(access)
+    parameters.keyAttributes = Unmanaged.passUnretained(keyAttributes)
     var format = SecExternalFormat.formatPKCS12
     var type = SecExternalItemType.itemTypeAggregate
     let keychain = openKeychain(path)
-    let status = withExtendedLifetime((passphrase, access)) {
+    let status = withExtendedLifetime((passphrase, access, keyAttributes)) {
         SecItemImport(data as CFData, nil, &format, &type, [], &parameters, keychain, nil)
     }
     guard status == errSecSuccess else { fail("the import failed (\(status))") }
@@ -113,10 +120,77 @@ func checkKey(named name: String, in path: String?) -> Never {
             }
         }
     }
-    guard found else { fail("there's no certificate named \"\(name)\"") }
+    guard found else { fail("there's no certificate named \"\(name)\"", status: 4) }
     guard openTo.isEmpty else {
         fail("these may use the key of \"\(name)\" without asking: \(openTo.sorted().joined(separator: ", "))", status: 3)
     }
+    exit(0)
+}
+
+/// The certificates named exactly `name` in the keychain (security's -c matches part of a name).
+func certificates(named name: String, in keychain: SecKeychain, path: String) -> [SecCertificate] {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassCertificate,
+        kSecMatchLimit as String: kSecMatchLimitAll,
+        kSecReturnRef as String: true,
+        kSecMatchSearchList as String: [keychain],
+    ]
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound { return [] }
+    guard status == errSecSuccess else { fail("can't search \(path) (\(status))") }
+    return (result as? [SecCertificate] ?? []).filter { SecCertificateCopySubjectSummary($0) as String? == name }
+}
+
+/// The private keys in the keychain with this application label, the SHA-1 of the public key.
+func privateKeyCount(label: Data, in keychain: SecKeychain, path: String) -> Int {
+    let query: [String: Any] = [
+        kSecClass as String: kSecClassKey,
+        kSecAttrKeyClass as String: kSecAttrKeyClassPrivate,
+        kSecAttrApplicationLabel as String: label,
+        kSecMatchLimit as String: kSecMatchLimitAll,
+        kSecReturnRef as String: true,
+        kSecMatchSearchList as String: [keychain],
+    ]
+    var result: CFTypeRef?
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound { return 0 }
+    guard status == errSecSuccess else { fail("can't search \(path) (\(status))") }
+    return (result as? [AnyObject])?.count ?? 0
+}
+
+func deleteIdentities(named name: String, in path: String) -> Never {
+    // Never asks: whatever would need a prompt fails instead.
+    SecKeychainSetUserInteractionAllowed(false)
+    let keychain = openKeychain(path)
+    let found = certificates(named: name, in: keychain, path: path)
+    guard !found.isEmpty else {
+        print("There's no \"\(name)\" certificate in \(path).")
+        exit(0)
+    }
+    var labels: [Data] = []
+    for certificate in found {
+        var identity: SecIdentity?
+        var key: SecKey?
+        if SecIdentityCreateWithCertificate(keychain, certificate, &identity) == errSecSuccess, let identity,
+           SecIdentityCopyPrivateKey(identity, &key) == errSecSuccess, let key {
+            guard let label = (SecKeyCopyAttributes(key) as? [String: Any])?[kSecAttrApplicationLabel as String] as? Data
+            else { fail("can't identify the private key of \"\(name)\"") }
+            labels.append(label)
+            // Item by item, so that nothing but this key and its certificate can match.
+            let status = SecKeychainItemDelete(unsafeBitCast(key, to: SecKeychainItem.self))
+            guard status == errSecSuccess else { fail("can't delete the private key of \"\(name)\" (\(status))") }
+        }
+        let status = SecKeychainItemDelete(unsafeBitCast(certificate, to: SecKeychainItem.self))
+        guard status == errSecSuccess else { fail("can't delete the \"\(name)\" certificate (\(status))") }
+    }
+    guard certificates(named: name, in: keychain, path: path).isEmpty else {
+        fail("a \"\(name)\" certificate is still in \(path)")
+    }
+    for label in labels where privateKeyCount(label: label, in: keychain, path: path) > 0 {
+        fail("the private key of \"\(name)\" is still in \(path)")
+    }
+    print("Deleted \(found.count) \"\(name)\" certificate(s) and \(labels.count) private key(s) from \(path).")
     exit(0)
 }
 
@@ -128,6 +202,9 @@ case "import" where arguments.count == 5 && arguments[3] == "--trust":
     importIdentity(into: arguments[1], name: arguments[2], trusting: [arguments[4]])
 case "check" where arguments.count == 2 || arguments.count == 3:
     checkKey(named: arguments[1], in: arguments.count == 3 ? arguments[2] : nil)
+case "delete" where arguments.count == 3:
+    deleteIdentities(named: arguments[1], in: arguments[2])
 default:
-    fail("usage: signing-key.swift import <keychain> <name> [--trust <app>] | check <name> [keychain]", status: 64)
+    fail("usage: signing-key.swift import <keychain> <name> [--trust <app>] | check <name> [keychain] | delete <name> <keychain>",
+         status: 64)
 }

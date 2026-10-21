@@ -1,12 +1,13 @@
 #!/bin/bash
-# Builds "Teams Pulse.app" into ./build, for this Mac's architecture, signed with the certificate that
-# scripts/make-signing-identity.sh creates.
+# Builds "Teams Pulse.app" into ./build, for this Mac's architecture. It's signed ad hoc, so macOS ties
+# Full Disk Access to this exact build, and each new build needs the access again. If you made the
+# optional "Teams Pulse Signing" certificate (scripts/make-signing-identity.sh), it's signed with that
+# instead, and keeps the access across rebuilds.
 #   --universal   builds for both Apple silicon and Intel instead.
 #   --install     also copies it to ~/Applications and (re)launches it.
-#   --ad-hoc      signs it ad hoc instead. macOS then ties Full Disk Access to this exact build, and
-#                 the next build has to be added to the Full Disk Access list again.
-# TEAMS_PULSE_SIGNING_IDENTITY names another certificate; TEAMS_PULSE_SIGNING_KEYCHAIN is a keychain
-# to find it in, instead of the search list.
+#   --ad-hoc      signs it ad hoc even if the certificate exists.
+# TEAMS_PULSE_SIGNING_IDENTITY names another certificate. TEAMS_PULSE_SIGNING_KEYCHAIN is a keychain of
+# its own that holds it (CI, scripts/ci-signing-identity.sh), and must.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -28,24 +29,36 @@ for arg in "$@"; do
     esac
 done
 
-if ! $AD_HOC && ! security find-certificate -c "$IDENTITY" ${KEYCHAIN:+"$KEYCHAIN"} >/dev/null 2>&1; then
-    echo "There's no signing certificate named \"$IDENTITY\". Create it once with 'make signing-identity'." >&2
-    echo "(Or pass --ad-hoc, but then Full Disk Access doesn't survive the next build.)" >&2
-    exit 1
-fi
-# If some app may use the key without asking, any program running as you could sign itself as Teams
-# Pulse with it, and get its Full Disk Access. A throwaway keychain of its own (CI) is the exception.
-if ! $AD_HOC && [[ -z "$KEYCHAIN" ]]; then
-    STATUS=0
-    swift -suppress-warnings scripts/signing-key.swift check "$IDENTITY" || STATUS=$?
-    if [[ $STATUS -eq 3 ]]; then
-        echo "So any program running as you could sign itself as Teams Pulse, and get its Full Disk Access." >&2
-        echo "Replace the certificate with one that every app has to ask to use, then build again:" >&2
-        echo "  scripts/make-signing-identity.sh --replace" >&2
+# Whether some app may use the key of your certificate without asking. If so, any program running as
+# you could sign itself as Teams Pulse with it, and get its Full Disk Access.
+check_key() { swift -suppress-warnings scripts/signing-key.swift check "$IDENTITY" 2>&1; }
+SIGN_WITH_CERTIFICATE=false
+if $AD_HOC; then
+    :
+elif [[ -n "$KEYCHAIN" ]]; then
+    if ! security find-certificate -c "$IDENTITY" "$KEYCHAIN" >/dev/null 2>&1; then
+        echo "There's no \"$IDENTITY\" certificate in $KEYCHAIN (TEAMS_PULSE_SIGNING_KEYCHAIN)." >&2
         exit 1
-    elif [[ $STATUS -ne 0 ]]; then
-        echo "warning: couldn't check which apps may use the key of \"$IDENTITY\"." >&2
     fi
+    SIGN_WITH_CERTIFICATE=true
+else
+    STATUS=0
+    OUTPUT="$(check_key)" || STATUS=$?
+    case $STATUS in
+        0) SIGN_WITH_CERTIFICATE=true ;;
+        4) ;; # No certificate: ad hoc.
+        3)
+            echo "$OUTPUT" >&2
+            echo "So any program running as you could sign itself as Teams Pulse, and get its Full Disk Access." >&2
+            echo "Delete the certificate, to build ad hoc, or replace it with one that every app has to ask to use:" >&2
+            echo "  scripts/make-signing-identity.sh --delete   (or --replace)" >&2
+            exit 1 ;;
+        *)
+            echo "$OUTPUT" >&2
+            echo "Couldn't check which apps may use the \"$IDENTITY\" key. Build with --ad-hoc, or delete the" >&2
+            echo "certificate: scripts/make-signing-identity.sh --delete" >&2
+            exit 1 ;;
+    esac
 fi
 
 BUILD_FLAGS=(-c release)
@@ -96,15 +109,30 @@ FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework"
 ditto "$SPARKLE" "$FRAMEWORK"
 rm -rf "$FRAMEWORK/XPCServices" "$FRAMEWORK/Versions/Current/XPCServices"
 
-if $AD_HOC; then
-    echo "warning: signing ad hoc. Full Disk Access granted to this build won't apply to the next one." >&2
+if ! $SIGN_WITH_CERTIFICATE; then
     ./scripts/sign-app.sh "$APP" --ad-hoc
-else
-    if [[ -z "$KEYCHAIN" ]]; then
-        echo "Signing with \"$IDENTITY\": macOS asks for your login password so that codesign can use its key." >&2
-        echo "Click Allow, never Always Allow." >&2
-    fi
+elif [[ -n "$KEYCHAIN" ]]; then
     ./scripts/sign-app.sh "$APP"
+else
+    echo "Signing with \"$IDENTITY\": macOS asks for your login password so that codesign can use its key." >&2
+    echo "Click Allow, never Always Allow." >&2
+    if ! ./scripts/sign-app.sh "$APP"; then
+        echo "codesign couldn't use the \"$IDENTITY\" key. When macOS asks, enter your login password and click" >&2
+        echo "Allow (never Always Allow), or build with --ad-hoc." >&2
+        exit 1
+    fi
+    # Always Allow, just now, would let codesign use the key without asking from now on.
+    STATUS=0
+    OUTPUT="$(check_key)" || STATUS=$?
+    if [[ $STATUS -eq 3 ]]; then
+        echo "$OUTPUT" >&2
+        echo "That was Always Allow, so anything running as you could now sign itself as Teams Pulse, and get" >&2
+        echo "its Full Disk Access. Run scripts/make-signing-identity.sh --replace (or --delete), and build again." >&2
+        exit 1
+    elif [[ $STATUS -ne 0 ]]; then
+        echo "$OUTPUT" >&2
+        echo "warning: couldn't check again which apps may use the \"$IDENTITY\" key." >&2
+    fi
 fi
 REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | sed -n 's/^#* *designated => //p')"
 echo "Built $APP (version $VERSION, $(lipo -archs "$APP/Contents/MacOS/$EXECUTABLE"))"
@@ -128,4 +156,9 @@ if $INSTALL; then
     cp -R "$APP" "$DEST/"
     open "$DEST/$APP_NAME.app"
     echo "Installed and launched $DEST/$APP_NAME.app"
+fi
+if ! $SIGN_WITH_CERTIFICATE; then
+    echo "note: signed ad hoc, so macOS ties Full Disk Access to this exact build. Give it the access again:" >&2
+    echo "      in Full Disk Access, remove Teams Pulse with −, then add this copy. To keep the access across" >&2
+    echo "      rebuilds, see \"Keeping Full Disk Access across rebuilds\" in the README." >&2
 fi

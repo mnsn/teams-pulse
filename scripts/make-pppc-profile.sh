@@ -18,7 +18,8 @@ if [[ ! -d "$APP" ]]; then
 fi
 REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | sed -n 's/^#* *designated => //p')"
 if [[ -z "$REQUIREMENT" || "$REQUIREMENT" == *cdhash* ]]; then
-    echo "$APP is signed ad hoc, so no profile can name it across builds. Sign it with a certificate." >&2
+    echo "$APP is signed ad hoc, so no profile can name it across builds. Use a release, which every version" >&2
+    echo "signs with the same certificate, or sign your builds with one of your own (make signing-identity)." >&2
     exit 1
 fi
 IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Contents/Info.plist")"

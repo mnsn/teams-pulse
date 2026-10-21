@@ -42,7 +42,7 @@ done
 codesign -dv "$APP" 2>&1 | grep '^CodeDirectory.*flags=.*runtime' >/dev/null || fail "isn't signed with the hardened runtime."
 REQUIREMENT="$(codesign -d -r- "$APP" 2>&1 | sed -n 's/^#* *designated => //p')"
 if [[ "$REQUIREMENT" == *cdhash* ]]; then
-    $ALLOW_AD_HOC || fail "is signed ad hoc (designated requirement: $REQUIREMENT), so Full Disk Access won't survive the next build. Run 'make signing-identity' and build again."
+    $ALLOW_AD_HOC || fail "is signed ad hoc (designated requirement: $REQUIREMENT). A release must be signed with a certificate, or each update would cost its users their Full Disk Access (see \"Releasing\" in CONTRIBUTING.md). Pass --allow-ad-hoc to check a build of your own."
 elif [[ "$REQUIREMENT" != *'identifier "com.asaf.TeamsPulse"'* || "$REQUIREMENT" != *certificate* ]]; then
     fail "has an unexpected designated requirement: $REQUIREMENT"
 fi

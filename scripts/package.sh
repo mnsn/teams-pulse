@@ -49,8 +49,15 @@ if [[ -z "$CHANGES" ]]; then
     exit 1
 fi
 
-# Signed with the certificate that TEAMS_PULSE_SIGNING_* names; the release workflow signs the app
-# again with the release certificate (scripts/sign-release.sh).
+# Signed with a certificate, as a release is: the release workflow signs the app again with the release
+# certificate (scripts/sign-release.sh). Ad hoc, scripts/check-app.sh would refuse it.
+IDENTITY="${TEAMS_PULSE_SIGNING_IDENTITY:-Teams Pulse Signing}"
+if [[ -z "${TEAMS_PULSE_SIGNING_KEYCHAIN:-}" ]] &&
+    ! security find-identity -p codesigning | grep -F "\"$IDENTITY\"" >/dev/null; then
+    echo "A package is signed with a certificate, like a release. Make a throwaway one for it, and build again:" >&2
+    echo "  export TEAMS_PULSE_SIGNING_KEYCHAIN=\"\$(scripts/ci-signing-identity.sh)\"" >&2
+    exit 1
+fi
 ./scripts/build-app.sh --universal
 ./scripts/check-app.sh "$APP" --universal $([[ $# -gt 0 ]] && echo --release)
 

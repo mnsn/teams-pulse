@@ -31,8 +31,9 @@ uninstall:
 	-pgrep -f "/Teams Pulse.app/Contents/MacOS/TeamsPulse" | xargs kill 2>/dev/null
 	rm -rf "$(HOME)/Applications/Teams Pulse.app"
 
-# Creates the self-signed certificate every build is signed with, so Full Disk Access survives
-# rebuilds. Run it once.
+# Optional: a self-signed certificate that every build is then signed with, instead of ad hoc, so Full
+# Disk Access survives rebuilds. Each build asks for your login password. scripts/make-signing-identity.sh
+# --delete goes back to ad hoc.
 signing-identity:
 	./scripts/make-signing-identity.sh
 

@@ -50,9 +50,11 @@ made it, and the app isn't notarized.
 - Anything that can sign with the certificate's key can sign itself as Teams Pulse and inherit its
   Full Disk Access. So the release certificate, **Teams Pulse Release**, is on no Mac: it's made in
   memory, once, and kept only in the `release` environment's secrets and the maintainer's password
-  manager. A certificate for building from source (`make signing-identity`) trusts no app to use its
-  key, not even codesign, which asks for the password every time, and `make app` refuses to sign
-  with a key that some app may use without asking.
+  manager.
+- Builds from source are signed ad hoc, so there's no key on the Mac that could sign as them. The
+  optional certificate that keeps their Full Disk Access across rebuilds (`make signing-identity`)
+  trusts no app to use its key, not even codesign, which asks for the password every time, and its
+  key can't be exported. `make app` refuses to sign with a key that some app may use without asking.
 
 ## How updates are verified
 

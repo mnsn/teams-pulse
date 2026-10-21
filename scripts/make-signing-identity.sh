@@ -1,15 +1,21 @@
 #!/bin/bash
-# Creates "Teams Pulse Signing", a self-signed code-signing certificate, in your login keychain. Every
-# build is signed with it (scripts/build-app.sh), so the app's designated requirement names this
-# certificate rather than the code's hashes, and macOS keeps Teams Pulse's Full Disk Access, and its
-# keychain item, across rebuilds. Ad-hoc signed builds lose both every time. Run it once per Mac.
-#   scripts/make-signing-identity.sh [--replace] [keychain]
+# Creates "Teams Pulse Signing", a self-signed code-signing certificate, in your login keychain. It's
+# optional: without it, builds are signed ad hoc, and macOS ties Full Disk Access to that exact build,
+# so each rebuild needs the access again. With it, scripts/build-app.sh signs every build with it, the
+# app's designated requirement names the certificate rather than the code's hashes, and macOS keeps
+# Teams Pulse's Full Disk Access across rebuilds. Run it once per Mac.
+#   scripts/make-signing-identity.sh [--replace | --delete | --check] [keychain]
 #
-# No app may use the certificate's private key without asking, not even codesign: any program that
-# could would be able to sign itself as Teams Pulse and get the Full Disk Access you gave it. So each
-# build asks for your login password: click Allow, never Always Allow. scripts/build-app.sh refuses to
-# sign with a key that some app may use without asking. --replace deletes the certificate and makes a
-# new one, and the next build then needs Full Disk Access once more.
+# The key is as powerful as that access: anything that can sign with it can sign itself as Teams Pulse
+# and get the Full Disk Access you gave Teams Pulse. So no app may use it without asking, not even
+# codesign, and it can't be exported: each build asks for your login password. Click Allow, never
+# Always Allow. scripts/build-app.sh refuses to sign with a key that some app may use without asking,
+# and checks again after signing.
+#   --replace   deletes the certificate and its key, such as one an earlier version of this script
+#               made, which let codesign use the key without asking, and makes a new one. Then give
+#               the next build Full Disk Access again.
+#   --delete    only deletes them: builds are signed ad hoc again.
+#   --check     says, without asking anything, whether some app may use the key without asking.
 #
 # TEAMS_PULSE_SIGNING_IDENTITY picks another name. With TEAMS_PULSE_KEYCHAIN_PASSWORD set, for a
 # throwaway keychain of its own (CI, scripts/ci-signing-identity.sh), codesign may use the key without
@@ -18,11 +24,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 NAME="${TEAMS_PULSE_SIGNING_IDENTITY:-Teams Pulse Signing}"
-REPLACE=false
-if [[ "${1:-}" == "--replace" ]]; then
-    REPLACE=true
-    shift
-fi
+MODE=create
+case "${1:-}" in
+    --replace) MODE=replace; shift ;;
+    --delete) MODE=delete; shift ;;
+    --check) MODE=check; shift ;;
+    -*) echo "Usage: $0 [--replace | --delete | --check] [keychain]" >&2; exit 2 ;;
+esac
 KEYCHAIN="${1:-$HOME/Library/Keychains/login.keychain-db}"
 OPEN_TO_CODESIGN=false
 if [[ -n "${TEAMS_PULSE_KEYCHAIN_PASSWORD:-}" ]]; then
@@ -38,34 +46,43 @@ fi
 OPENSSL=/usr/bin/openssl
 signing_key() { swift -suppress-warnings scripts/signing-key.swift "$@"; }
 
-if security find-certificate -c "$NAME" "$KEYCHAIN" >/dev/null 2>&1; then
-    if $REPLACE; then
-        # find-certificate -c matches part of the name, so only exact matches are deleted.
-        HASHES="$(security find-certificate -a -c "$NAME" -Z "$KEYCHAIN" | awk -v name="$NAME" '
-            /^SHA-1 hash:/ { hash = $3 }
-            /"labl"<blob>=/ { label = $0; sub(/^[^=]*="/, "", label); sub(/"$/, "", label); if (label == name) print hash }
-        ')"
-        for hash in $HASHES; do
-            security delete-identity -Z "$hash" "$KEYCHAIN" >/dev/null 2>&1 ||
-                security delete-certificate -Z "$hash" "$KEYCHAIN" >/dev/null
-        done
-        echo "Deleted the old \"$NAME\" from $KEYCHAIN."
-    else
-        STATUS=0
-        $OPEN_TO_CODESIGN || signing_key check "$NAME" "$KEYCHAIN" || STATUS=$?
-        if [[ $STATUS -eq 0 ]]; then
-            echo "\"$NAME\" is already in $KEYCHAIN. Nothing to do."
-            exit 0
-        elif [[ $STATUS -eq 3 ]]; then
-            cat >&2 <<EOF
+if [[ $MODE == check ]]; then
+    STATUS=0
+    signing_key check "$NAME" "$KEYCHAIN" || STATUS=$?
+    if [[ $STATUS -eq 0 ]]; then
+        echo "No app may use the \"$NAME\" key without asking."
+    elif [[ $STATUS -eq 3 ]]; then
+        echo "So anything running as you could sign itself as Teams Pulse, and get the Full Disk Access you" >&2
+        echo "gave it. Run scripts/make-signing-identity.sh --replace, or --delete to build ad hoc." >&2
+    elif [[ $STATUS -eq 4 ]]; then
+        echo "So builds are signed ad hoc." >&2
+    fi
+    exit $STATUS
+fi
+if [[ $MODE == replace || $MODE == delete ]]; then
+    signing_key delete "$NAME" "$KEYCHAIN"
+    if [[ $MODE == delete ]]; then
+        echo "Builds are signed ad hoc now: give each new build Full Disk Access again."
+        exit 0
+    fi
+else
+    STATUS=0
+    OUTPUT="$(signing_key check "$NAME" "$KEYCHAIN" 2>&1)" || STATUS=$?
+    if [[ $STATUS -eq 0 ]] || { $OPEN_TO_CODESIGN && [[ $STATUS -eq 3 ]]; }; then
+        echo "\"$NAME\" is already in $KEYCHAIN. Nothing to do."
+        exit 0
+    elif [[ $STATUS -eq 3 ]]; then
+        echo "$OUTPUT" >&2
+        cat >&2 <<EOF
 So any program running as you could sign itself with it as Teams Pulse, and get the Full Disk Access
 you gave Teams Pulse. Replace it with a certificate that every app has to ask to use:
   scripts/make-signing-identity.sh --replace
-Then give the next build Full Disk Access once more.
+or delete it, and build ad hoc: scripts/make-signing-identity.sh --delete
 EOF
-        else
-            echo "To start over with a new \"$NAME\", run: scripts/make-signing-identity.sh --replace" >&2
-        fi
+        exit 1
+    elif [[ $STATUS -ne 4 ]]; then
+        echo "$OUTPUT" >&2
+        echo "To start over with a new \"$NAME\", run: scripts/make-signing-identity.sh --replace" >&2
         exit 1
     fi
 fi
@@ -108,6 +125,7 @@ else
     signing_key check "$NAME" "$KEYCHAIN"
     LEAF="$(printf '%s\n' "$CERTIFICATE" | "$OPENSSL" x509 -outform DER | shasum -a 1 | cut -d ' ' -f 1)"
     echo "Created \"$NAME\" in $KEYCHAIN (certificate leaf = H\"$LEAF\")."
-    echo "No app may use its key without asking. Each build asks for your login password so that codesign"
-    echo "can sign with it: click Allow, never Always Allow."
+    echo "No app may use its key without asking, and it can't be exported. Each build asks for your login"
+    echo "password so that codesign can sign with it: click Allow, never Always Allow. Give the next build"
+    echo "Full Disk Access; later builds keep it."
 fi

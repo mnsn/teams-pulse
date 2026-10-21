@@ -169,13 +169,19 @@ signature that says how to recognize it again, and checks the running app agains
   app with different code hashes still satisfies it (`codesign -R=<requirement> --verify` passes), so
   macOS keeps the access.
 
-`scripts/make-signing-identity.sh` creates that certificate, self-signed, for code signing only,
-valid for 10 years, in the login keychain. Nothing has to trust it: macOS matches the certificate
-itself. `scripts/build-app.sh` signs every build with it (through `scripts/sign-app.sh`), with no
-timestamp, so signing makes no network request, and `scripts/check-app.sh` fails if a build's
-requirement names code hashes. The keychain item for the unread chats relies on the same signature.
+Builds from source are signed ad hoc (`scripts/build-app.sh`, through `scripts/sign-app.sh`), with
+the hardened runtime and no timestamp, so signing makes no network request. Each build needs Full
+Disk Access again, but there's no key on the Mac that anything could sign as Teams Pulse with. The
+keychain item for the unread chats trusts the app by its signature too, so macOS may ask whether a
+new build may use it; declined, the saved chats are left alone.
 
-### Who may use the signing key
+### An optional certificate for builds from source
+
+`scripts/make-signing-identity.sh` (`make signing-identity`) creates a certificate, self-signed, for
+code signing only, valid for 10 years, in the login keychain, and `scripts/build-app.sh` then signs
+every build with it, so Full Disk Access survives rebuilds. Nothing has to trust the certificate:
+macOS matches the certificate itself. `--delete` deletes it and its key, and builds are signed ad hoc
+again.
 
 Matching a certificate is only as strong as the private key behind it: anything that can sign with
 the key can sign itself as `com.asaf.TeamsPulse`, satisfy the requirement, and get the Full Disk
@@ -184,10 +190,12 @@ Access the user gave Teams Pulse. So no app may use the key without asking:
 - `security import` can't make such a key. With `-T /usr/bin/codesign`, codesign may use the key
   silently; without it, `/usr/bin/security`, the app that imported it, may. Either way, any program
   running as the user could have it sign. `scripts/signing-key.swift` imports the key with an access
-  list that trusts no app, so codesign asks for the login password every time.
+  list that trusts no app, so codesign asks for the login password every time, and as
+  non-extractable, so it can't be exported even with the password.
 - **Always Allow** in that prompt would add codesign to the list. `scripts/build-app.sh` reads the
-  list before every build (without prompting) and refuses to sign while any app is on it.
-  `scripts/make-signing-identity.sh --replace` swaps such a certificate for a new one.
+  list before every build, and again after signing (without prompting), and refuses to go on while
+  any app is on it. `scripts/make-signing-identity.sh --replace` swaps such a certificate for a new
+  one, and `--check` reads the list.
 - Sparkle.framework is signed ad hoc, so each build uses the key once, and asks once. With library
   validation off (below), the app loads the framework whoever signed it, and the app's own signature
   records the framework's exact code hash.
@@ -198,16 +206,17 @@ asking, since nothing could answer a prompt there.
 
 ### Releases
 
-Releases are signed the same way, all with one certificate, **Teams Pulse Release**, which isn't on
-any Mac. `scripts/make-release-keys.sh` makes it in memory, once, for the `release` environment's
-secrets and the maintainer's password manager, so only the release workflow's approved job can sign
-with it. That job checks that the signed app has the designated requirement in
-`Resources/ReleaseRequirement.txt`, so a release can't quietly cost everyone their access. CI, and
-the release's build job, sign with a throwaway certificate instead.
+Releases are signed with a certificate too, all with the same one, **Teams Pulse Release**, which
+isn't on any Mac. `scripts/make-release-keys.sh` makes it in memory, once, for the `release`
+environment's secrets and the maintainer's password manager, so only the release workflow's
+approved job can sign with it. That job checks that the signed app has the designated requirement in
+`Resources/ReleaseRequirement.txt`, so a release can't quietly cost everyone their access, and
+`scripts/check-app.sh` fails if a release's requirement names code hashes. CI, and the release's
+build job, sign with a throwaway certificate instead.
 
 Changing the certificate, or the bundle identifier, loses Full Disk Access once: remove Teams Pulse
 from the list and add it again. That's also what happens when a copy you built updates itself to a
-release, or when the maintainer installs a release over their own build.
+release.
 
 ### The hardened runtime and library validation
 

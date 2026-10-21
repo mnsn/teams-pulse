@@ -24,17 +24,21 @@ make build              # debug build
 make demo-check         # check that the demo chats land in the expected lists
 make render             # draw the menu bar, both lists and the Full Disk Access window from the demo data
 make screenshots        # render the README's screenshots (with summaries, if Apple Intelligence is on)
-make signing-identity   # once per Mac: create the certificate every build is signed with
-make pppc-profile       # a configuration profile that grants the built app Full Disk Access, for MDM
-make app                # build "Teams Pulse.app" into ./build, signed with it
-make package            # what a release ships: the universal app, checked and zipped, in build/release
+make app                # build "Teams Pulse.app" into ./build, signed ad hoc
 make install            # build the app, copy it to ~/Applications and open it
+make signing-identity   # optional: a certificate that builds are then signed with, to keep Full Disk Access
+make pppc-profile       # a configuration profile that grants the built app Full Disk Access, for MDM
+make package            # what a release ships: the universal app, checked and zipped, in build/release
 make icon               # regenerate Resources/AppIcon.icns
 ```
 
-`make app`, `make install`, `make package` and `make pppc-profile` sign the app, so they ask for your
-login password before `codesign` can use your certificate's key. Click **Allow**, never
-**Always Allow**: see [Why the signing certificate?](README.md#why-the-signing-certificate).
+Builds are signed ad hoc, so each one needs Full Disk Access again. With a certificate from
+`make signing-identity`, they keep it, and each build asks for your login password before `codesign`
+can use the certificate's key: click **Allow**, never **Always Allow** (see
+[Keeping Full Disk Access across rebuilds](README.md#keeping-full-disk-access-across-rebuilds)).
+`scripts/make-signing-identity.sh --delete` goes back to ad hoc. `make package` signs with a
+certificate, as a release does; `export TEAMS_PULSE_SIGNING_KEYCHAIN="$(scripts/ci-signing-identity.sh)"`
+makes a throwaway one for it.
 
 These read your own Teams notifications, through Terminal's Full Disk Access:
 
@@ -108,9 +112,10 @@ log show --last 10m --info --predicate 'subsystem == "com.asaf.TeamsPulse"' --st
 - **Summaries stay on the Mac.** Use `SystemLanguageModel` only, never
   `PrivateCloudComputeLanguageModel` or any other model that runs elsewhere.
 - **No app may use a signing key without asking.** Whoever can sign with the certificate can sign
-  as Teams Pulse and inherit its Full Disk Access. Import keys with an access list that trusts no
-  app (`scripts/signing-key.swift`), never with `security import -T` or `-A`, except in a throwaway
-  keychain for CI. Keep the release keys out of every Mac's keychain.
+  as Teams Pulse and inherit its Full Disk Access. Builds are signed ad hoc unless you opt in to a
+  certificate; import its key with an access list that trusts no app (`scripts/signing-key.swift`),
+  never with `security import -T` or `-A`, except in a throwaway keychain for CI. Keep the release
+  keys out of every Mac's keychain.
 - **No content in logs.** Log counts, states and errors, never names, messages or chat IDs.
 - **Use made-up data.** Names, messages and IDs from real Teams chats are private, and often
   confidential. Don't put them in tests, screenshots, issues or pull requests. `--diagnose` output is

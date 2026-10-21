@@ -17,9 +17,10 @@ The first version.
   time you open it, it asks whether to check for updates automatically, once a day.
   **Check for Updates…** in its settings checks right away. It installs only updates that come from
   this project's GitHub releases and are signed with the project's key.
-- **Signing**: every release is signed with the same certificate, and every build from source with
-  your own, rather than ad hoc, so Full Disk Access survives updates and rebuilds. No program can
-  use either certificate's key unasked, so none can sign itself as Teams Pulse to get its access.
+- **Signing**: every release is signed with the same certificate, so Full Disk Access survives
+  updates. Builds from source are signed ad hoc, or, to keep Full Disk Access across rebuilds, with a
+  certificate of your own (`make signing-identity`). No program can use either certificate's key
+  unasked, so none can sign itself as Teams Pulse to get its access.
 - **Private**: reads Notification Center's database read-only. The only network requests are the
   update checks and downloads, from GitHub. Nothing about your chats is sent.
 - A universal app for Apple silicon and Intel Macs with macOS 15 or later. Summaries need macOS 26.
