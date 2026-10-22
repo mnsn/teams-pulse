@@ -225,8 +225,8 @@ approved job can sign with it. That job checks that the signed app has the desig
 build job, sign with a throwaway certificate instead.
 
 Changing the certificate, or the bundle identifier, loses Full Disk Access once: remove Teams Pulse
-from the list (or reset its entry with `tccutil`, as above) and add it again. That's also what happens when a copy you built updates itself to a
-release.
+from the list (or reset its entry with `tccutil`, as above) and add it again. That's also what
+happens when a copy you built updates itself to a release.
 
 ### The hardened runtime and library validation
 
@@ -238,10 +238,16 @@ The hardened runtime also turns on library validation, which loads only librarie
 or by the app's own team. A self-signed certificate has no team, so macOS would refuse Sparkle,
 even signed with the same certificate ("mapping process and mapped file (non-platform) have
 different Team IDs"). The app's one entitlement, `com.apple.security.cs.disable-library-validation`
-in `Resources/TeamsPulse.entitlements`, turns that check off. The cost: anything that can change the
-files inside the app could make it load other code, with its Full Disk Access, which is why
-[SECURITY.md](../SECURITY.md#how-the-app-is-signed) says to keep it in `/Applications`. A Developer
-ID certificate would make the entitlement unnecessary.
+in `Resources/TeamsPulse.entitlements`, turns that check off. The cost: macOS recognizes the app by
+its own executable's signature, and with library validation off, the app loads whatever its
+Sparkle.framework holds. So anything running as you could copy the app anywhere, put its own code in
+the copy's framework, and run the copy with Teams Pulse's Full Disk Access, without touching the
+installed app; where the app is installed doesn't change that. The same weakness in another app was
+published as [CVE-2025-4081](https://cert.pl/en/posts/2025/05/tcc-bypass/)
+([SECURITY.md](../SECURITY.md#how-the-app-is-signed)). Any of these would close it: a Developer ID
+certificate, which would make the entitlement unnecessary; running Sparkle in a process of its own,
+so that the app loads no libraries but Apple's; or a library load constraint (macOS 14 and later), a
+rule in the app's signature that lets it load only the Sparkle it ships with.
 
 ## Updating the app
 

@@ -2,11 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- The app is signed with the hardened runtime, so no other process can inject code into it
-	     (DYLD_* variables are ignored) and use its Full Disk Access. Library validation, though, only
-	     loads frameworks with the app's Team ID, and a self-signed certificate has none, so it refuses
+	<!-- Library validation, which the hardened runtime turns on, loads only frameworks signed by Apple
+	     or with the app's Team ID, and a self-signed certificate has none, so it refuses
 	     Sparkle.framework, the updater, even signed with the same certificate. This turns off only
-	     that check. scripts/check-app.sh fails on any other entitlement. -->
+	     that check; the hardened runtime still ignores DYLD_* variables, and scripts/check-app.sh
+	     fails on any other entitlement. The cost: macOS recognizes the app by its own executable's
+	     signature, so anything running as you could copy the app, put its own code in the copy's
+	     Sparkle.framework, and run the copy with Teams Pulse's Full Disk Access, wherever the app is
+	     installed. "How the app is signed" in SECURITY.md says what would close that. -->
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 </dict>

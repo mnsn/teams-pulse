@@ -20,6 +20,7 @@ reporting:
 - any way it could send anything about chats off the Mac, or expose it to other users or apps on
   the Mac (its saved unread chats, its log, its summaries),
 - any way another app could use Teams Pulse's Full Disk Access, such as by injecting code into it,
+  other than the one that [How the app is signed](#how-the-app-is-signed) describes,
 - any way it could change Notification Center's data,
 - any way to make it install an update that the release workflow here didn't sign, and
 - problems with how the build scripts and workflows here create, sign or publish the app.
@@ -43,9 +44,15 @@ made it, and the app isn't notarized.
 - Library validation is off (`com.apple.security.cs.disable-library-validation`, the app's only
   entitlement). With it on, macOS loads only libraries signed by Apple or by the app's own team,
   and a self-signed certificate has no team, so macOS would refuse even the app's own copy of
-  Sparkle, its updater. The trade-off: software that can change the files inside the app, such as
-  malware running as you, could make it load other code and use its Full Disk Access. Keep the app
-  in `/Applications`. A Developer ID would let the app turn library validation back on.
+  Sparkle, its updater. The trade-off: macOS recognizes the app by its own executable's signature,
+  so software running as you, such as malware, could copy Teams Pulse anywhere, put its own code in
+  the copy's Sparkle.framework, and run the copy with Teams Pulse's Full Disk Access, without
+  touching the installed app. Where the app is installed doesn't change that. The same weakness in
+  another app was published as [CVE-2025-4081](https://cert.pl/en/posts/2025/05/tcc-bypass/). Any
+  of these would close it: a Developer ID, which would let the app turn library validation back
+  on; running Sparkle in a process of its own, so that the app loads no libraries but Apple's; or a
+  library load constraint (macOS 14 and later), a rule in the app's signature that lets it load
+  only the Sparkle it ships with.
 - `scripts/check-app.sh` checks each build for these settings, and CI runs it.
 - Anything that can sign with the certificate's key can sign itself as Teams Pulse and inherit its
   Full Disk Access. So the release certificate, **Teams Pulse Release**, is on no Mac: it's made in
