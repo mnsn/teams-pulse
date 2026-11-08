@@ -3,6 +3,18 @@
 [![CI](https://github.com/mnsn/teams-pulse/actions/workflows/ci.yml/badge.svg)](https://github.com/mnsn/teams-pulse/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
 
+> [!IMPORTANT]
+> We recommend moving to [BriefBar](https://github.com/mnsn/brief-bar), which brings Copilot Pulse,
+> Teams Pulse and ADO Pulse together in one macOS app. All sources start off: turn on only the ones
+> you want in Settings, then choose what appears in the menu bar, desktop widgets and windows, and
+> hide the rest.
+>
+> Enable only Teams for the Teams Pulse experience without enabling Copilot or Azure DevOps.
+>
+> [Download BriefBar](https://github.com/mnsn/brief-bar/releases/latest/download/BriefBar.zip) or run
+> `brew install --cask mnsn/tap/briefbar`, then follow the
+> [migration instructions](https://github.com/mnsn/brief-bar/blob/main/docs/user-guide.md#moving-from-the-pulse-apps).
+
 A small macOS menu-bar app that shows your unread Microsoft Teams chats at a glance: one item for
 **1:1 chats** and one for **group chats**, each with a count and its own list. Click a chat to open
 it in Teams, at the first message you haven't read.
